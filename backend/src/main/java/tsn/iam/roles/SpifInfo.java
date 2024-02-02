@@ -24,20 +24,15 @@ public class SpifInfo {
 
     private static final Logger LOGGER = Logger.getLogger( SpifInfo.class.getName() );
 
-    public SpifInfo(){
+    public SpifInfo(String spifPath){
         try {
-            conf = SpifPropertiesLoader.loadProperties();
-
-            String path = conf.getProperty("spif.path");
-        File folder = new File(path);
+        File folder = new File(spifPath);
         File[] listOfFiles = folder.listFiles();
         
         for (int i = 0; i < listOfFiles.length; i++) {
-            if (listOfFiles[i].isFile()) {
-                LOGGER.info("Spif \"" + listOfFiles[i].getName() + "\" loaded");
-            } else if (listOfFiles[i].isDirectory()) {
-                LOGGER.info("Directory in spif directory path named : " + listOfFiles[i].getName());
-            }
+            if (listOfFiles[i].isFile()) LOGGER.info("Spif \"" + listOfFiles[i].getName() + "\" loaded");
+            else if (listOfFiles[i].isDirectory()) LOGGER.info("Directory in spif directory path named : " + listOfFiles[i].getName());
+            
             JAXBContext context = JAXBContext.newInstance(SPIF.class);
             Unmarshaller jaxbUnmarshaller = context.createUnmarshaller();
             SPIF mySpif = (SPIF) jaxbUnmarshaller.unmarshal(listOfFiles[i]);
@@ -59,7 +54,6 @@ public class SpifInfo {
         }//first for
         } 
         catch (JAXBException e) { e.printStackTrace(); }
-        catch (IOException e) { e.printStackTrace(); }
     }
 
 

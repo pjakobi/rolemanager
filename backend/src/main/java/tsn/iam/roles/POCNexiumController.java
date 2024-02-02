@@ -69,7 +69,9 @@ public class POCNexiumController {
                         @Value("${ldap.port}") String port,
                         @Value("${ldap.treeroot}") String treeroot,
                         @Value("${ldap.login}") String login,
-                        @Value("${ldap.password}") String password)
+                        @Value("${ldap.password}") String password,
+                        @Value("${spif.path}") String spifPath
+                        )
     {
 
         this.ipaddress = ipaddress;
@@ -77,6 +79,7 @@ public class POCNexiumController {
         this.password = password;
         this.port = port;
         this.treeroot = treeroot;
+        
         //JndidapAPI.connect("ldap://127.0.1.1:389/dc=example,dc=com","cn=admin,dc=example,dc=com","LDAP");
         try {
             String url = "ldap://" + this.ipaddress + ":" + this.port + "/" + this.treeroot;
@@ -89,7 +92,7 @@ public class POCNexiumController {
             e.printStackTrace();
         }
 
-        this.spifi = new SpifInfo();
+        this.spifi = new SpifInfo(spifPath);
         }
 
 
