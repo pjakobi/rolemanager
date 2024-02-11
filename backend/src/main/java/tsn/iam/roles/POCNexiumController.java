@@ -1,10 +1,16 @@
 package tsn.iam.roles;
 
+import java.io.FileNotFoundException;
+
 //import tsn.iam.roles.AttributeCertificate.*;
 //import tsn.iam.roles.AttributeCertificate.SPIF.SpifInfo;
 //import tsn.iam.roles.LDAP.*;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.net.UnknownHostException;
+import java.nio.file.InvalidPathException;
 import java.security.InvalidKeyException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -12,6 +18,7 @@ import java.security.NoSuchProviderException;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -22,10 +29,15 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import java.util.ResourceBundle;
+import java.util.logging.Level;
+import java.util.logging.Logger; // SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST
+import java.net.InetAddress;
 
+import javax.naming.InvalidNameException;
 import javax.naming.NameAlreadyBoundException;
 import javax.naming.NamingException;
+import javax.naming.ldap.LdapName;
 
 import org.bouncycastle.asn1.x509.AttributeCertificateInfo;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
@@ -45,55 +57,69 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.xml.bind.JAXBException;
+
+
 @CrossOrigin (origins = "*", exposedHeaders = "*", allowedHeaders = "*")
 
 @RestController
 public class POCNexiumController {
-
-    private final String ipaddress;
-
-    private final String port;
-
-    private final String treeroot;
-
-    private final String login;
-
+	private InetAddress server=null;
+    private final Integer port;
+    private LdapName treeroot=null;
+    private LdapName login=null;
     private final String password;
 
     private SpifInfo spifi;
-
-    private static final Logger LOGGER = Logger.getLogger( POCNexiumController.class.getName() );
+    private static final String className = POCNexiumController.class.getName();
+    private static final Logger LOGGER = Logger.getLogger( className );
 
     
-    POCNexiumController(@Value("${ldap.ipaddress}") String ipaddress,
+    POCNexiumController(@Value("${ldap.server}") String server,
                         @Value("${ldap.port}") String port,
                         @Value("${ldap.treeroot}") String treeroot,
                         @Value("${ldap.login}") String login,
                         @Value("${ldap.password}") String password,
                         @Value("${spif.path}") String spifPath
-                        )
+                        ) throws NamingException, InvalidPathException, JAXBException, IOException
     {
+        // logging
+        final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
+        MessageFormat formatter;
 
-        this.ipaddress = ipaddress;
-        this.login = login;
+        // Set up context
+        // With InetAddress.getByName, we get host name/IP 
+        try { this.server = InetAddress.getByName(server); } // host name/IP
+        catch (UnknownHostException e1) {
+        	formatter = new MessageFormat(bundle.getString("ldap.invalidHost"));
+        	LOGGER.severe(formatter.format(new Object[] {this.server.toString()}));
+        	new RolesLogger(className, Level.SEVERE,"ldap.invalidHost", new Object[] {this.server.toString()});
+			throw new UnknownHostException(formatter.format(this.server.toString()));
+		}
+        try { this.login = new LdapName(login); } 
+        catch (InvalidNameException e) {
+        	RolesLogger logger = new RolesLogger(className, Level.SEVERE,"ldap.invalidName", new Object[] {this.login.toString()});
+        	throw new UnknownHostException(logger.toString());
+        }
         this.password = password;
-        this.port = port;
-        this.treeroot = treeroot;
+        this.port = Integer.parseInt(port);  
+        try { this.treeroot = new LdapName(treeroot); } 
+        catch (InvalidNameException e) {
+        	RolesLogger logger = new RolesLogger(className, Level.SEVERE,"ldap.invalidName", new Object[] {this.treeroot.toString()});
+        	throw new UnknownHostException(logger.toString());
+        }
+
+        // Bind to Dir.         
+        new RolesLogger(className, Level.SEVERE,"ldap.connect", new Object[] {this.server.toString().split("/")[0], this.port.toString(), this.treeroot.toString()});
+       
+       //MessageFormat fmt2 = new MessageFormat(bundle.getString("ldap.bind"));
+       //LOGGER.info(fmt2.format(this.login.toString()));  
+       JndidapAPI.connect(this.server, this.port, this.login, this.password);
+       LOGGER.fine(bundle.getString("ldap.connectOK")); 
         
-        //JndidapAPI.connect("ldap://127.0.1.1:389/dc=example,dc=com","cn=admin,dc=example,dc=com","LDAP");
-        try {
-            String url = "ldap://" + this.ipaddress + ":" + this.port + "/" + this.treeroot;
-            LOGGER.info("Connecting to LDAP using : " + url);
-            JndidapAPI.connect(url, this.login, this.password);
-        //System.out.println(url + this.login + this.password);
 
-        } catch (Exception e) {
-            System.out.println(this.ipaddress + this.port + this.treeroot + this.login + this.password);
-            e.printStackTrace();
-        }
-
-        this.spifi = new SpifInfo(spifPath);
-        }
+        this.spifi = new SpifInfo(spifPath); 
+    }
 
 
     
@@ -104,14 +130,12 @@ public class POCNexiumController {
             ArrayList<String> users = JndidapAPI.getUsers();
             LOGGER.info(users.toString());
             return new ResponseEntity<ArrayList<String>>(users, HttpStatus.OK);
-
         } catch (NamingException e) {
-            // TODO Auto-generated catch block
+        	System.err.println(e.getLocalizedMessage());
             e.printStackTrace();
-        }
-        
-        return new ResponseEntity<ArrayList<String>>(HttpStatus.NOT_FOUND);
-    }
+            return new ResponseEntity<ArrayList<String>>(HttpStatus.NOT_FOUND);
+        } 
+    } // getLDAPUsers
     
     
     @GetMapping("/lacv/{policyID}")

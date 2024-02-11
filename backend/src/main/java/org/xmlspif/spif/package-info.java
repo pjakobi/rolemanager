@@ -5,5 +5,5 @@
 // Generated on: 2022.05.01 at 12:18:02 PM CEST 
 //
 
-@javax.xml.bind.annotation.XmlSchema(namespace = "http://www.xmlspif.org/spif", elementFormDefault = javax.xml.bind.annotation.XmlNsForm.QUALIFIED)
+@jakarta.xml.bind.annotation.XmlSchema(namespace = "http://www.xmlspif.org/spif", elementFormDefault = jakarta.xml.bind.annotation.XmlNsForm.QUALIFIED)
 package org.xmlspif.spif;

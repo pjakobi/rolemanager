@@ -2,6 +2,9 @@ package tsn.iam.roles;
 
 
 import java.io.IOException;
+import java.net.URL;
+import java.net.InetAddress;
+import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,9 +14,11 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.Vector;
 import java.util.logging.Logger;
 
+import javax.naming.ldap.LdapName;
 import javax.naming.AuthenticationException;
 import javax.naming.AuthenticationNotSupportedException;
 import javax.naming.Context;
@@ -58,39 +63,36 @@ public class JndidapAPI {
 
 
     private static final Logger LOGGER = Logger.getLogger( JndidapAPI.class.getName() );
-
+    private static ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
+    private static MessageFormat formatter;
+    
     /**
      * Connect to the LDAP
      * @param url the LDAP url
      * @param login the LDAP login
      * @param pwd the LDAP password
+     * @throws NamingException 
      */
-    public static void connect(String url, String login, String pwd){
+    public static void connect(InetAddress server, int port, LdapName login, String pwd) 
+    throws NamingException {
         Hashtable<String, String> env = new Hashtable<String, String>();
         env.put(Context.INITIAL_CONTEXT_FACTORY,"com.sun.jndi.ldap.LdapCtxFactory");
-        env.put(Context.PROVIDER_URL, url);
+        env.put(Context.PROVIDER_URL, "ldap://" + server.toString().split("/")[0]+ ":" + port);
         env.put(Context.SECURITY_AUTHENTICATION,"simple");
-        env.put(Context.SECURITY_PRINCIPAL,login);
+        env.put(Context.SECURITY_PRINCIPAL,login.toString());
         env.put(Context.SECURITY_CREDENTIALS,pwd);
         env.put("java.naming.ldap.attributes.binary",
         "attributeCertificateAttribute clearance");//TRES IMPORTANT : Nécessaire pour récupérer un byte array en lisant attributeCertificateAttribute et clearance, sinon on ne peut 
         //pas le lire en tant qu'objet binaire
         //pour que ca fontionne il faut modifier la syntaxe de attributeCertificateAttribute dans le LDAP en OCTET String : 1.3.6.1.4.1.1466.115.121.1.40
-        
+             
         try{
-            ctx = new InitialLdapContext(env, null);
-            LOGGER.info("Connected to LDAP");
-            
-        
-    }catch (AuthenticationNotSupportedException ex){
-        LOGGER.severe("The authentification is not supported by the server");
-    } catch (AuthenticationException ex){
-        LOGGER.severe("incorrect password or username");
-    }catch (NamingException ex){
-        LOGGER.severe("Error when trying to create context");
-        System.out.println(ex);
-    }
-
+            ctx = new InitialLdapContext(env, null);     
+        } catch (NamingException ex) { 
+        	formatter = new MessageFormat(bundle.getString("ldap.incorrectAuthn"));
+        	LOGGER.warning(formatter.format(new Object[] {ex.getLocalizedMessage(),login.toString()}));
+        	throw new NamingException(formatter.format(ex.getLocalizedMessage(),login.toString()));
+        } 
     }
 
 
@@ -99,18 +101,11 @@ public class JndidapAPI {
         ArrayList<String> users = new ArrayList<String>();
         NamingEnumeration answer = ctx.search("ou=people", null);
 
-        try {
-            while(answer.hasMore()){
+        while(answer.hasMore()){
                 SearchResult sr = (SearchResult) answer.next();
                 LOGGER.info("LDAP user found : " + sr.getNameInNamespace().substring(0, sr.getNameInNamespace().indexOf(",")));
                 users.add(sr.getNameInNamespace().substring(0, sr.getNameInNamespace().indexOf(",")));
-            }
-        } catch (NamingException e) {
-            // TODO: handle exception
-            e.printStackTrace();
         }
-        
-
         return users;
         
     }
