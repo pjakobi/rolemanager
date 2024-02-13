@@ -31,14 +31,13 @@ public class SpifInfo {
     private static final Logger LOGGER = Logger.getLogger( className );
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private MessageFormat formatter;
-    
+    private final RolesLogger rlog=new RolesLogger(className);
 
     
     // Decode one SPIF file & store it in spifMap
     private void spifData(Unmarshaller jaxbUnmarshaller, String spifName) throws JAXBException {
     	try {
-    		//spifLog(Level.INFO, "spif.start", new Object[] {spifName});
-    		new RolesLogger(className, Level.INFO, "spif.start", new Object[] {spifName});
+    		rlog.doLog(Level.INFO, "spif.start", new Object[] {spifName});
     		
     		SPIF mySpif = (SPIF) jaxbUnmarshaller.unmarshal(new File(spifName));
     		Hashtable<String,String> spifTable = new Hashtable<String,String>();
@@ -48,16 +47,16 @@ public class SpifInfo {
 			spifList.add(spifTable);
 			spifMap.put(mySpif.getSecurityPolicyId().getId(), spifList);
 			
-			new RolesLogger(className, Level.FINE, "spif.decoded", new Object[] {spifName});
+			rlog.doLog(Level.FINE, "spif.decoded", new Object[] {spifName});
     	} catch (JAXBException e) { 
-    		new RolesLogger(className, Level.WARNING, "spif.decodeErr", new Object[] {spifName,e.getLocalizedMessage()});
-    		throw new JAXBException(spifName + ": " + e.getLocalizedMessage()); 
+    		rlog.doLog(Level.WARNING, "spif.decodeErr", new Object[] {spifName,e.getLocalizedMessage()});
+    		throw new JAXBException(rlog.toString("spif.decodeErr", new Object[] {spifName,e.getLocalizedMessage()})); 
     	}
     }
     
     // Inspect the SPIF Directory
     public SpifInfo(String spifPath) throws JAXBException,InvalidPathException, IOException {
-    	new RolesLogger(className, Level.FINE, "spif.path",new Object[] {spifPath});
+    	rlog.doLog(Level.FINE, "spif.path",new Object[] {spifPath});
     	Unmarshaller jaxbUnmarshaller ;
     	
     	JAXBContext context = JAXBContext.newInstance(SPIF.class);
@@ -65,7 +64,7 @@ public class SpifInfo {
         
     	try {
     		Files.list(Paths.get(spifPath)).forEach(file -> { // every file in spifPath 
-    			new RolesLogger(className, Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
+    			rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
     			try { spifData(jaxbUnmarshaller,spifPath + "/" + file.getFileName().toString()); }
     			catch (JAXBException e) { // logged in spifData - do nothing
     				//fmt = new MessageFormat(bundle.getString("spif.decodeErr"));	
@@ -73,8 +72,8 @@ public class SpifInfo {
             }
         }); 
     	} catch (IOException e) {
-    		new RolesLogger(className, Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
-    		throw new IOException(formatter.format(new Object[] {spifPath, e.getLocalizedMessage()}));
+    		rlog.doLog(Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
+    		throw new IOException(rlog.toString("spif.readDirErr",new Object[] {spifPath, e.getLocalizedMessage()}));
     	} 
     } // SpifInfo
 

@@ -72,8 +72,7 @@ public class POCNexiumController {
 
     private SpifInfo spifi;
     private static final String className = POCNexiumController.class.getName();
-    private static final Logger LOGGER = Logger.getLogger( className );
-
+    private final RolesLogger rlog=new RolesLogger(className);
     
     POCNexiumController(@Value("${ldap.server}") String server,
                         @Value("${ldap.port}") String port,
@@ -91,34 +90,29 @@ public class POCNexiumController {
         // With InetAddress.getByName, we get host name/IP 
         try { this.server = InetAddress.getByName(server); } // host name/IP
         catch (UnknownHostException e1) {
-        	formatter = new MessageFormat(bundle.getString("ldap.invalidHost"));
-        	LOGGER.severe(formatter.format(new Object[] {this.server.toString()}));
-        	new RolesLogger(className, Level.SEVERE,"ldap.invalidHost", new Object[] {this.server.toString()});
-			throw new UnknownHostException(formatter.format(this.server.toString()));
+        	rlog.doLog(Level.SEVERE,"ldap.invalidHost", new Object[] {this.server.toString()});
+			throw new UnknownHostException(rlog.toString());
 		}
         try { this.login = new LdapName(login); } 
         catch (InvalidNameException e) {
-        	RolesLogger logger = new RolesLogger(className, Level.SEVERE,"ldap.invalidName", new Object[] {this.login.toString()});
-        	throw new UnknownHostException(logger.toString());
+        	rlog.doLog(Level.SEVERE,"ldap.invalidName", new Object[] {this.login.toString()});
+        	throw new UnknownHostException(rlog.toString());
         }
         this.password = password;
         this.port = Integer.parseInt(port);  
         try { this.treeroot = new LdapName(treeroot); } 
         catch (InvalidNameException e) {
-        	RolesLogger logger = new RolesLogger(className, Level.SEVERE,"ldap.invalidName", new Object[] {this.treeroot.toString()});
-        	throw new UnknownHostException(logger.toString());
+        	rlog.doLog(Level.SEVERE,"ldap.invalidName", new Object[] {this.treeroot.toString()});
+        	throw new UnknownHostException(rlog.toString());
         }
 
         // Bind to Dir.         
-        new RolesLogger(className, Level.SEVERE,"ldap.connect", new Object[] {this.server.toString().split("/")[0], this.port.toString(), this.treeroot.toString()});
+        rlog.doLog(Level.SEVERE,"ldap.connect", new Object[] {this.server.toString().split("/")[0], this.port.toString(), this.treeroot.toString()});
        
-       //MessageFormat fmt2 = new MessageFormat(bundle.getString("ldap.bind"));
-       //LOGGER.info(fmt2.format(this.login.toString()));  
        JndidapAPI.connect(this.server, this.port, this.login, this.password);
-       LOGGER.fine(bundle.getString("ldap.connectOK")); 
-        
+       rlog.doLog(Level.FINE,"ldap.connectOK",new Object[] {}); 
 
-        this.spifi = new SpifInfo(spifPath); 
+       this.spifi = new SpifInfo(spifPath); 
     }
 
 
@@ -128,7 +122,7 @@ public class POCNexiumController {
     public ResponseEntity<ArrayList<String>> getLDAPUsers() {
         try {
             ArrayList<String> users = JndidapAPI.getUsers();
-            LOGGER.info(users.toString());
+            rlog.doLog(Level.INFO, "ldap.users", new Object[] {users.toString()});
             return new ResponseEntity<ArrayList<String>>(users, HttpStatus.OK);
         } catch (NamingException e) {
         	System.err.println(e.getLocalizedMessage());
@@ -190,7 +184,7 @@ public class POCNexiumController {
     @GetMapping("/userAC/{entry}")
     public ResponseEntity<ArrayList<Hashtable<String,String>>> getACOfUser(@PathVariable String entry){//no JSON there otherwise it can't be a GET request
         //String entry = (String) payload.get("entry");
-        LOGGER.info(entry);
+        //LOGGER.info(entry);
         //System.out.println(entry);
         List<String> userACs = JndidapAPI.getACOfUser(entry);
         String[] ACinfoString = new String[6];
@@ -202,7 +196,7 @@ public class POCNexiumController {
                 Hashtable<String, String> userACTable = new Hashtable<String,String>(); 
                 
                 X509AttributeCertificateHolder ACHolder = new X509AttributeCertificateHolder(ACbyte);
-                LOGGER.info("Certificate number : " + i);
+                //LOGGER.info("Certificate number : " + i);
                 userACTable.put("Start", ACInfo.getStartDate(ACHolder).toString());
                 userACTable.put("End", ACInfo.getEndDate(ACHolder).toString());
                 userACTable.put("Clearance", spifi.getName(ACInfo.getPolicyID(ACHolder).toString(), ACInfo.getClearance(ACHolder).toString()));
@@ -233,7 +227,7 @@ public class POCNexiumController {
     @GetMapping("/roles/{entry}/{policyID}")
     public ResponseEntity<ArrayList<String>> getClearanceOfPolicyID(@PathVariable String entry, @PathVariable String policyIdFromRequest){//no JSON there otherwise it can't be a GET request
         //String entry = (String) payload.get("entry");
-        LOGGER.info(entry);
+        //LOGGER.info(entry);
         //System.out.println(entry);
         List<String> userACs = JndidapAPI.getACOfUser(entry);
         //List<String> clearanceList = new Vector<String>();
@@ -262,7 +256,7 @@ public class POCNexiumController {
                             clearanceList.add(clearance);
                         }
                     }
-                    else LOGGER.warning("Number of failed verification : " + failedVerify++);
+                    else rlog.doLog(Level.WARNING,"ac.verifFailures", new Object[] {failedVerify++});
                         
                 } 
 
@@ -306,23 +300,22 @@ public class POCNexiumController {
                         policyID = ACInfo.getPolicyID(ACHolder);
                         multiMap.add(policyID,clearance);
                     }
-                    else LOGGER.warning("Number of failed verification : " + failedVerify++);
+                    else rlog.doLog(Level.WARNING,"ac.verifFailures", new Object[] {failedVerify++});
                 }
                 Iterator<String> itID = multiMap.keySet().iterator();
                 
 
                 while (itID.hasNext()){
                     String pol = itID.next();
-                    LOGGER.info(pol);
+                    rlog.doLog(Level.INFO,"ac.policy", new Object[] {pol});
                     //String[] roles = (String[]) multiMap.get(pol).toArray();
-                    LOGGER.info("Arrays : " + Arrays.toString(multiMap.get(pol).toArray()));
+                    rlog.doLog(Level.INFO,"arrays", new Object[] {Arrays.toString(multiMap.get(pol).toArray())});
                     map.put(pol, multiMap.get(pol).toArray());
-                    Iterator<String> itClear = multiMap.get(pol).iterator();
-                    while (itClear.hasNext()){
-                     LOGGER.info(itClear.next());
-                    }
+                    //Iterator<String> itClear = multiMap.get(pol).iterator();
+                    for (String itClear: multiMap.get(pol)) rlog.doLog(Level.INFO,"ac.policy", new Object[] {itClear});
+                    
                 }
-                LOGGER.info("getRoles response");
+                rlog.doLog(Level.INFO,"spif.response",new Object[] {});
                 //return new ResponseEntity<LinkedMultiValueMap<String,String>>(multiMap, HttpStatus.OK);
                 return new ResponseEntity<Map<String,Object[]>>(map, HttpStatus.OK);
             } catch (IOException e) {
@@ -347,7 +340,7 @@ public class POCNexiumController {
         String fin = (String) payload.get("end");//long value to string
         String requestor = (String) payload.get("requestor");
         String policyID = (String) payload.get("policyID");
-        LOGGER.info(holderName + " " + sclear + " " + debut + " " + fin + " " + requestor + " " + policyID);
+        rlog.doLog(Level.INFO,"spif.acReq",new Object[] {holderName, sclear, debut, fin, requestor, policyID});
         int clearance = Integer.parseInt(sclear);
         long ldebut = Long.parseLong(debut);
         long lfin = Long.parseLong(fin);
@@ -419,7 +412,7 @@ public class POCNexiumController {
             return new ResponseEntity<String>( HttpStatus.CREATED);
         } catch (NameAlreadyBoundException e1){
             //e1.printStackTrace();
-            LOGGER.info("Entry already exist, will be overwritten");
+        	rlog.doLog(Level.INFO,"spif.overwrite",new Object[] {});
             JndidapAPI.deleteEntry(entry);
             
             try {
@@ -474,15 +467,12 @@ public class POCNexiumController {
             e.printStackTrace();
             return new ResponseEntity<String>( HttpStatus.NOT_ACCEPTABLE);
         } catch (NoSuchProviderException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return new ResponseEntity<String>( HttpStatus.NOT_ACCEPTABLE);
         } catch (SignatureException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return new ResponseEntity<String>( HttpStatus.NOT_ACCEPTABLE);
         } catch (CMSException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             return new ResponseEntity<String>( HttpStatus.NOT_ACCEPTABLE);
         }
