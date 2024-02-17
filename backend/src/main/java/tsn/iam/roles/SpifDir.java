@@ -2,16 +2,21 @@ package tsn.iam.roles;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import org.xmlspif.spif.SPIF;
+import org.xmlspif.spif.SecurityCategoryTagSet;
 import org.xmlspif.spif.SecurityClassification;
 
 import jakarta.xml.bind.JAXBContext;
@@ -23,53 +28,27 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
-public class SpifInfo {
+public class SpifDir {
     private static Properties conf;
         
-    private static Map<String,ArrayList<Hashtable<String,String>>> spifMap = new HashMap<String,ArrayList<Hashtable<String,String>>>();
-    private static final String className = SpifInfo.class.getName();
+    private static Map<String,ArrayList<Hashtable<BigInteger,String>>> spifMap = new HashMap<String,ArrayList<Hashtable<BigInteger,String>>>();
+    private static Map<String,String> descriptions = new HashMap<String,String>(); // LACV, label
+    private static final String className = SpifDir.class.getName();
     private static final Logger LOGGER = Logger.getLogger( className );
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private MessageFormat formatter;
     private final RolesLogger rlog=new RolesLogger(className);
-
     
-    // Decode one SPIF file & store it in spifMap
-    private void spifData(Unmarshaller jaxbUnmarshaller, String spifName) throws JAXBException {
-    	try {
-    		rlog.doLog(Level.INFO, "spif.start", new Object[] {spifName});
-    		
-    		SPIF mySpif = (SPIF) jaxbUnmarshaller.unmarshal(new File(spifName));
-    		Hashtable<String,String> spifTable = new Hashtable<String,String>();
-			for (SecurityClassification classif: mySpif.getSecurityClassifications().getSecurityClassification()) 
-				spifTable.put(classif.getLacv().toString(), classif.getName());
-			ArrayList<Hashtable<String,String>> spifList = new ArrayList<Hashtable<String,String>>();
-			spifList.add(spifTable);
-			spifMap.put(mySpif.getSecurityPolicyId().getId(), spifList);
-			
-			rlog.doLog(Level.FINE, "spif.decoded", new Object[] {spifName});
-    	} catch (JAXBException e) { 
-    		rlog.doLog(Level.WARNING, "spif.decodeErr", new Object[] {spifName,e.getLocalizedMessage()});
-    		throw new JAXBException(rlog.toString("spif.decodeErr", new Object[] {spifName,e.getLocalizedMessage()})); 
-    	}
-    }
+    private Set<spifFile> dir = new HashSet<>();
     
     // Inspect the SPIF Directory
-    public SpifInfo(String spifPath) throws JAXBException,InvalidPathException, IOException {
-    	rlog.doLog(Level.FINE, "spif.path",new Object[] {spifPath});
-    	Unmarshaller jaxbUnmarshaller ;
-    	
-    	JAXBContext context = JAXBContext.newInstance(SPIF.class);
-    	jaxbUnmarshaller = context.createUnmarshaller();
-        
+    public SpifDir(String spifPath) throws JAXBException,InvalidPathException, IOException {
+    	rlog.doLog(Level.FINE, "spif.path",new Object[] {spifPath});     
     	try {
     		Files.list(Paths.get(spifPath)).forEach(file -> { // every file in spifPath 
-    			rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
-    			try { spifData(jaxbUnmarshaller,spifPath + "/" + file.getFileName().toString()); }
-    			catch (JAXBException e) { // logged in spifData - do nothing
-    				//fmt = new MessageFormat(bundle.getString("spif.decodeErr"));	
-    				//LOGGER.warning(fmt.format(new Object[] {file.getFileName(),e.getLocalizedMessage()})); 
-            }
+    		rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
+    		try { dir.add(new spifFile(spifPath + "/" + file.getFileName().toString())); }
+    		catch (JAXBException e) { } // logged in spifData - do nothing else
         }); 
     	} catch (IOException e) {
     		rlog.doLog(Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
@@ -107,7 +86,7 @@ public class SpifInfo {
     }
 
 
-    public ArrayList<Hashtable<String,String>> getAvailableClearance(String policyID) {
+    public ArrayList<Hashtable<BigInteger,String>> getAvailableClearance(String policyID) {
         LOGGER.info(Arrays.toString(spifMap.get(policyID).toArray()));
         return spifMap.get(policyID);
         

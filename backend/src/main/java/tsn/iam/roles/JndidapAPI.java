@@ -16,6 +16,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Vector;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.naming.ldap.LdapName;
@@ -40,6 +41,8 @@ import org.bouncycastle.asn1.DERBitString;
 import org.bouncycastle.asn1.DERGeneralizedTime;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 
 
 public class JndidapAPI {
@@ -60,11 +63,12 @@ public class JndidapAPI {
     private static final String HOLDER_STRING = "holder";
     private static final String DESCRIPTION_STRING = "description";
     private static final String INET_STRING = "inetOrgPerson";
-
+    
 
     private static final Logger LOGGER = Logger.getLogger( JndidapAPI.class.getName() );
     private static ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private static MessageFormat formatter;
+    private static RolesLogger rlog=new RolesLogger(JndidapAPI.class.getName());
     
     /**
      * Connect to the LDAP
@@ -89,22 +93,26 @@ public class JndidapAPI {
         try{
             ctx = new InitialLdapContext(env, null);     
         } catch (NamingException ex) { 
-        	formatter = new MessageFormat(bundle.getString("ldap.incorrectAuthn"));
-        	LOGGER.warning(formatter.format(new Object[] {ex.getLocalizedMessage(),login.toString()}));
+        	rlog.doLog(Level.WARNING, "ldap.incorrectAuthn", new Object[] {ex.getLocalizedMessage(), login.toString()});
         	throw new NamingException(formatter.format(ex.getLocalizedMessage(),login.toString()));
         } 
     }
 
 
-    public static ArrayList<String> getUsers() throws NamingException {
+    public static ArrayList<LdapName> getUsers(LdapName userstree) throws NamingException {
 
-        ArrayList<String> users = new ArrayList<String>();
-        NamingEnumeration answer = ctx.search("ou=people", null);
-
+        ArrayList<LdapName> users = new ArrayList<LdapName>();
+        NamingEnumeration answer = null;
+        try { answer = ctx.search(userstree.toString(),null); }
+        catch (NamingException e) {
+        	rlog.doLog(Level.FINE,"ldap.error.user", new Object[] {e.getLocalizedMessage()});
+        	throw new NamingException();
+        }
         while(answer.hasMore()){
                 SearchResult sr = (SearchResult) answer.next();
-                LOGGER.info("LDAP user found : " + sr.getNameInNamespace().substring(0, sr.getNameInNamespace().indexOf(",")));
-                users.add(sr.getNameInNamespace().substring(0, sr.getNameInNamespace().indexOf(",")));
+                LdapName user = new LdapName(sr.getNameInNamespace().toString());
+                users.add(user);
+                rlog.doLog(Level.FINE,"ldap.user", new Object[] {user});
         }
         return users;
         

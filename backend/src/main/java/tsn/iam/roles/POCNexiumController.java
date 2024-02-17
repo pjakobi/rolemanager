@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 //import tsn.iam.roles.LDAP.*;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -43,7 +44,9 @@ import org.bouncycastle.asn1.x509.AttributeCertificateInfo;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
 import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.operator.OperatorCreationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -70,23 +73,27 @@ public class POCNexiumController {
     private LdapName login=null;
     private final String password;
 
-    private SpifInfo spifi;
+    private SpifDir spifi;
     private static final String className = POCNexiumController.class.getName();
     private final RolesLogger rlog=new RolesLogger(className);
+    @Autowired Environment env;
     
     POCNexiumController(@Value("${ldap.server}") String server,
                         @Value("${ldap.port}") String port,
                         @Value("${ldap.treeroot}") String treeroot,
                         @Value("${ldap.login}") String login,
                         @Value("${ldap.password}") String password,
-                        @Value("${spif.path}") String spifPath
+                        @Value("${spif.path}") String spifPath,
+                        @Value("${ldap.userstree") String spifPeopleSubtree
                         ) throws NamingException, InvalidPathException, JAXBException, IOException
     {
-        // logging
+    	
+
+    	// logging
         final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
         MessageFormat formatter;
 
-        // Set up context
+        
         // With InetAddress.getByName, we get host name/IP 
         try { this.server = InetAddress.getByName(server); } // host name/IP
         catch (UnknownHostException e1) {
@@ -112,7 +119,7 @@ public class POCNexiumController {
        JndidapAPI.connect(this.server, this.port, this.login, this.password);
        rlog.doLog(Level.FINE,"ldap.connectOK",new Object[] {}); 
 
-       this.spifi = new SpifInfo(spifPath); 
+       this.spifi = new SpifDir(spifPath); 
     }
 
 
@@ -120,21 +127,24 @@ public class POCNexiumController {
 
     @GetMapping("/users")
     public ResponseEntity<ArrayList<String>> getLDAPUsers() {
+    	ArrayList<String> strUsers = new ArrayList();
         try {
-            ArrayList<String> users = JndidapAPI.getUsers();
-            rlog.doLog(Level.INFO, "ldap.users", new Object[] {users.toString()});
-            return new ResponseEntity<ArrayList<String>>(users, HttpStatus.OK);
+        	LdapName searchedTree = new LdapName(env.getProperty("ldap.userstree") + "," + env.getProperty("ldap.treeroot"));
+        	rlog.doLog(Level.INFO,"ldap.users", new Object[] {searchedTree.toString()});
+            ArrayList<LdapName> users = JndidapAPI.getUsers(searchedTree);
+            for (LdapName index : users) strUsers.add(index.toString());
+            return new ResponseEntity<ArrayList<String>>(strUsers, HttpStatus.OK);
         } catch (NamingException e) {
-        	System.err.println(e.getLocalizedMessage());
+        	rlog.doLog(Level.WARNING,"ldap.error.search", new Object[] {e.getLocalizedMessage()});
             e.printStackTrace();
-            return new ResponseEntity<ArrayList<String>>(HttpStatus.NOT_FOUND);
+            return new ResponseEntity<ArrayList<String>>(strUsers,HttpStatus.NOT_FOUND);
         } 
     } // getLDAPUsers
     
     
     @GetMapping("/lacv/{policyID}")
-    public ResponseEntity<ArrayList<Hashtable<String,String>>> getAvailableClearance(@PathVariable String policyID){
-        return new ResponseEntity<ArrayList<Hashtable<String,String>>>(this.spifi.getAvailableClearance(policyID), HttpStatus.OK);
+    public ResponseEntity<ArrayList<Hashtable<BigInteger,String>>> getAvailableClearance(@PathVariable String policyID){
+        return new ResponseEntity<ArrayList<Hashtable<BigInteger,String>>>(this.spifi.getAvailableClearance(policyID), HttpStatus.OK);
     }
 
 
