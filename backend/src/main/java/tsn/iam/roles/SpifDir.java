@@ -28,6 +28,8 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+
 public class SpifDir {
     private static Properties conf;
         
@@ -86,10 +88,8 @@ public class SpifDir {
     }
 
 
-    public ArrayList<Hashtable<BigInteger,String>> getAvailableClearance(String policyID) {
-        LOGGER.info(Arrays.toString(spifMap.get(policyID).toArray()));
-        return spifMap.get(policyID);
-        
+    public ArrayList<Hashtable<BigInteger,String>> getClearances(ASN1ObjectIdentifier policyID) {
+        return spifMap.get(policyID);       
     }
 
 }

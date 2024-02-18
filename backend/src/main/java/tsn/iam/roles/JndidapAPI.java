@@ -43,7 +43,7 @@ import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.cert.X509AttributeCertificateHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 public class JndidapAPI {
 
@@ -63,8 +63,6 @@ public class JndidapAPI {
     private static final String HOLDER_STRING = "holder";
     private static final String DESCRIPTION_STRING = "description";
     private static final String INET_STRING = "inetOrgPerson";
-    
-
     private static final Logger LOGGER = Logger.getLogger( JndidapAPI.class.getName() );
     private static ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private static MessageFormat formatter;

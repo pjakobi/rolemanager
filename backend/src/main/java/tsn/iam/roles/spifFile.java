@@ -14,13 +14,13 @@ import org.xmlspif.spif.SecurityClassification;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Unmarshaller;
-
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 public class spifFile {
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private final RolesLogger rlog=new RolesLogger(spifFile.class.getName());
     
 	private static Map<BigInteger, String> classifications = new HashMap<BigInteger,String>(); // LACV, label
-	private static String policyId;
+	private static ASN1ObjectIdentifier policyId;
 	private static String policyName;
 	
 	spifFile(String fileName) throws JAXBException {	
@@ -33,13 +33,13 @@ public class spifFile {
     		rlog.doLog(Level.INFO, "spif.start", new Object[] {fileName, spif.getSecurityPolicyId().getId()});
     		
     		// Extract data
-    		policyId = spif.getSecurityPolicyId().getId();
+    		policyId = new ASN1ObjectIdentifier(spif.getSecurityPolicyId().getId());
     		policyName = spif.getSecurityPolicyId().getName();
-    		rlog.doLog(Level.FINE, "spif.description", new Object[] {policyId, policyName});
+    		rlog.doLog(Level.FINE, "spif.description", new Object[] {policyId.toString(), policyName});
     		
     		spif.getSecurityClassifications().getSecurityClassification().forEach(classif -> {
     			classifications.put(classif.getLacv(), classif.getName());
-    			rlog.doLog(Level.FINE, "spif.classif", new Object[] {policyId,classif.getLacv(),classif.getName()});
+    			rlog.doLog(Level.FINE, "spif.classif", new Object[] {policyId.toString(),classif.getLacv(),classif.getName()});
     		});
 				
 			rlog.doLog(Level.FINE, "spif.decoded", new Object[] {new File(fileName).getName()});

@@ -61,7 +61,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.xml.bind.JAXBException;
-
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 @CrossOrigin (origins = "*", exposedHeaders = "*", allowedHeaders = "*")
 
@@ -75,7 +75,7 @@ public class POCNexiumController {
 
     private SpifDir spifi;
     private static final String className = POCNexiumController.class.getName();
-    private final RolesLogger rlog=new RolesLogger(className);
+    private RolesLogger rlog=new RolesLogger(className);
     @Autowired Environment env;
     
     POCNexiumController(@Value("${ldap.server}") String server,
@@ -144,7 +144,8 @@ public class POCNexiumController {
     
     @GetMapping("/lacv/{policyID}")
     public ResponseEntity<ArrayList<Hashtable<BigInteger,String>>> getAvailableClearance(@PathVariable String policyID){
-        return new ResponseEntity<ArrayList<Hashtable<BigInteger,String>>>(this.spifi.getAvailableClearance(policyID), HttpStatus.OK);
+    	RolesLogger.doLog(Level.WARNING,"spif.clearances", new Object[] {policyID.toString()});
+        return new ResponseEntity<ArrayList<Hashtable<BigInteger,String>>>(this.spifi.getClearances(new ASN1ObjectIdentifier(policyID)), HttpStatus.OK);
     }
 
 
