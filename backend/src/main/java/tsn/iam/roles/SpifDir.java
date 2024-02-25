@@ -41,15 +41,19 @@ public class SpifDir {
     private final RolesLogger rlog=new RolesLogger(className);
     
     private Set<spifFile> dir = new HashSet<>();
+    private Set<ASN1ObjectIdentifier> policies = new HashSet<ASN1ObjectIdentifier>();
     
     // Inspect the SPIF Directory
     public SpifDir(String spifPath) throws JAXBException,InvalidPathException, IOException {
-    	rlog.doLog(Level.FINE, "spif.path",new Object[] {spifPath});     
+    	rlog.doLog(Level.INFO, "spif.path",new Object[] {spifPath});  	
     	try {
     		Files.list(Paths.get(spifPath)).forEach(file -> { // every file in spifPath 
-    			rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
-    			try { dir.add(new spifFile(spifPath + "/" + file.getFileName().toString())); }
-    			catch (JAXBException e) { } // logged in spifData - do nothing else
+    			rlog.doLog(Level.INFO, "spif.loaded", new Object[] {file.getFileName()});
+    			try {
+    				spifFile myFile = new spifFile(spifPath + "/" + file.getFileName());
+   					if (!(checkDuplicate(myFile.getPolicyId(), myFile.getFileName()))) dir.add(myFile); 
+    				
+    		} catch (JAXBException e) { } // logged in spifData - do nothing else
     		}); 
     	} catch (IOException e) {
     		rlog.doLog(Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
@@ -70,6 +74,17 @@ public class SpifDir {
 //        return "null";
 //    }
 
+    public Boolean checkDuplicate(ASN1ObjectIdentifier policy, String fileName) {
+    	rlog.doLog(Level.FINE,"spif.checkDuplicate", new Object[] {policy,fileName});
+
+    	if (policies.contains(policy)) { // Duplicate
+    		rlog.doLog(Level.WARNING,"spif.duplicate", new Object[] {policy, fileName});
+    		return true;
+    	} else {
+    		policies.add(policy);
+    		return false;
+    	}
+    } // checkDuplicate
 
     public String getName(ASN1ObjectIdentifier policyID, Integer lacv){
     	rlog.doLog(Level.FINE,"spif.getName", new Object[] {policyID,lacv});

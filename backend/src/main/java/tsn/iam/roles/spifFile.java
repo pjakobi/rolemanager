@@ -22,6 +22,7 @@ public class spifFile {
 	private static Map<BigInteger, String> classifications = new HashMap<BigInteger,String>(); // LACV, label
 	private static ASN1ObjectIdentifier policyId;
 	private static String policyName;
+	private static String fileName;
 	
 	spifFile(String fileName) throws JAXBException {	
 		try {
@@ -35,17 +36,23 @@ public class spifFile {
     		// Extract data
     		policyId = new ASN1ObjectIdentifier(spif.getSecurityPolicyId().getId());
     		policyName = spif.getSecurityPolicyId().getName();
+    		this.fileName = fileName;
     		rlog.doLog(Level.FINE, "spif.description", new Object[] {policyId.toString(), policyName});
     		
     		spif.getSecurityClassifications().getSecurityClassification().forEach(classif -> {
     			classifications.put(classif.getLacv(), classif.getName());
     			rlog.doLog(Level.FINE, "spif.classif", new Object[] {policyId.toString(),classif.getLacv(),classif.getName()});
     		});
-				
 			rlog.doLog(Level.FINE, "spif.decoded", new Object[] {new File(fileName).getName()});
     	} catch (JAXBException e) { 
     		rlog.doLog(Level.WARNING, "spif.decodeErr", new Object[] {fileName,e.getLocalizedMessage()});
     		throw new JAXBException(rlog.toString("spif.decodeErr", new Object[] {fileName,e.getLocalizedMessage()})); 
     	}
 	} // spifFile
+	
+	public ASN1ObjectIdentifier getPolicyId() { return policyId; }
+	public String getFileName() { // base name only
+		File myFile = new File(fileName);
+		return myFile.getName(); 
+	}
 } // class

@@ -89,9 +89,6 @@ public class POCNexiumController {
                         ) throws NamingException, InvalidPathException, JAXBException, IOException
     {
     	
-
-
-        
         // With InetAddress.getByName, we get host name/IP 
         try { this.server = InetAddress.getByName(server); } // host name/IP
         catch (UnknownHostException e1) {
@@ -505,7 +502,6 @@ public class POCNexiumController {
         JndidapAPI.deleteEntry(entry);
 
         return new ResponseEntity<String>(HttpStatus.OK);
-
     }
 
     @DeleteMapping("/userAC/{uid}/{user}")
