@@ -33,12 +33,11 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 public class SpifDir {
     private static Properties conf;
         
-    private static Map<String,ArrayList<Hashtable<BigInteger,String>>> spifMap = new HashMap<String,ArrayList<Hashtable<BigInteger,String>>>();
+    private static Map<ASN1ObjectIdentifier,Hashtable<BigInteger,String>> spifMap = new HashMap<ASN1ObjectIdentifier,Hashtable<BigInteger,String>>();
     private static Map<String,String> descriptions = new HashMap<String,String>(); // LACV, label
     private static final String className = SpifDir.class.getName();
     private static final Logger LOGGER = Logger.getLogger( className );
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
-    private MessageFormat formatter;
     private final RolesLogger rlog=new RolesLogger(className);
     
     private Set<spifFile> dir = new HashSet<>();
@@ -48,48 +47,45 @@ public class SpifDir {
     	rlog.doLog(Level.FINE, "spif.path",new Object[] {spifPath});     
     	try {
     		Files.list(Paths.get(spifPath)).forEach(file -> { // every file in spifPath 
-    		rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
-    		try { dir.add(new spifFile(spifPath + "/" + file.getFileName().toString())); }
-    		catch (JAXBException e) { } // logged in spifData - do nothing else
-        }); 
+    			rlog.doLog(Level.FINE, "spif.loaded", new Object[] {file.getFileName()});
+    			try { dir.add(new spifFile(spifPath + "/" + file.getFileName().toString())); }
+    			catch (JAXBException e) { } // logged in spifData - do nothing else
+    		}); 
     	} catch (IOException e) {
     		rlog.doLog(Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
     		throw new IOException(rlog.toString("spif.readDirErr",new Object[] {spifPath, e.getLocalizedMessage()}));
     	} 
     } // SpifInfo
 
-
-    public String getLACV(String policyID, String role){
-        for(int i = 0; i<spifMap.get(policyID).size();i++){
-            String str =  spifMap.get(policyID).get(i).values().toString().substring(1, spifMap.get(policyID).get(i).values().toString().length()-1);
-            LOGGER.info("Role label and policy ID received : " + policyID + " - " + role);
-            if(str.equals(role)){
-                LOGGER.info("LACV returned : " + spifMap.get(policyID).get(i).keySet().toString().substring(1, spifMap.get(policyID).get(i).keySet().toString().length()-1)); 
-                return spifMap.get(policyID).get(i).keySet().toString().substring(1, spifMap.get(policyID).get(i).keySet().toString().length()-1);
-            }
-        }
-
-        return "null";
-    }
-
-    public String getName(String policyID, String lacv){
-
-        for(int i = 0; i<spifMap.get(policyID).size();i++){
-            String str =  spifMap.get(policyID).get(i).keySet().toString().substring(1, spifMap.get(policyID).get(i).keySet().toString().length()-1);
-            LOGGER.info("LACV and policy ID received : " + policyID + " - " + lacv);
-            if(str.equals(lacv)){
-                LOGGER.info("Role label returned : " + spifMap.get(policyID).get(i).values().toString().substring(1, spifMap.get(policyID).get(i).values().toString().length()-1));
-                return spifMap.get(policyID).get(i).values().toString().substring(1, spifMap.get(policyID).get(i).values().toString().length()-1);
-            }
-        }
-
-        return "Role doesn't exist for this policyID";
-        
-    }
+  
+//    public String getLACV(String policyID, String role){
+//        for(int i = 0; i<spifMap.get(policyID).size();i++){
+//            String str =  spifMap.get(policyID).get(i).values().toString().substring(1, spifMap.get(policyID).get(i).values().toString().length()-1);
+//            LOGGER.info("Role label and policy ID received : " + policyID + " - " + role);
+//            if(str.equals(role)){
+//                LOGGER.info("LACV returned : " + spifMap.get(policyID).get(i).keySet().toString().substring(1, spifMap.get(policyID).get(i).keySet().toString().length()-1)); 
+//                return spifMap.get(policyID).get(i).keySet().toString().substring(1, spifMap.get(policyID).get(i).keySet().toString().length()-1);
+//            }
+//        }
+//        return "null";
+//    }
 
 
-    public ArrayList<Hashtable<BigInteger,String>> getClearances(ASN1ObjectIdentifier policyID) {
-        return spifMap.get(policyID);       
-    }
+    public String getName(ASN1ObjectIdentifier policyID, Integer lacv){
+    	rlog.doLog(Level.FINE,"spif.getName", new Object[] {policyID,lacv});
+    	Hashtable<BigInteger,String> ht = spifMap.get(policyID);
+    	if (ht != null) {
+    		String clearance = ht.get(lacv.toString());
+    		if (clearance != null) {    			
+    			rlog.doLog(Level.FINE,"spif.getName.ok", new Object[] {clearance});
+    			return clearance;
+    		}
+    	}
+    	rlog.doLog(Level.FINE,"spif.getName.nok", new Object[] {});
+    	return null; // policy or Lacv not found
+    } // getName
+
+
+    public Hashtable<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { return spifMap.get(policyID); }
 
 }

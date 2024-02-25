@@ -75,8 +75,9 @@ public class POCNexiumController {
 
     private SpifDir spifi;
     private static final String className = POCNexiumController.class.getName();
-    private RolesLogger rlog=new RolesLogger(className);
+    private static RolesLogger rlog=new RolesLogger(className);
     @Autowired Environment env;
+	//private String ACTable.put;
     
     POCNexiumController(@Value("${ldap.server}") String server,
                         @Value("${ldap.port}") String port,
@@ -89,9 +90,6 @@ public class POCNexiumController {
     {
     	
 
-    	// logging
-        final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
-        MessageFormat formatter;
 
         
         // With InetAddress.getByName, we get host name/IP 
@@ -127,7 +125,7 @@ public class POCNexiumController {
 
     @GetMapping("/users")
     public ResponseEntity<ArrayList<String>> getLDAPUsers() {
-    	ArrayList<String> strUsers = new ArrayList();
+    	ArrayList<String> strUsers = new ArrayList<String>();
         try {
         	LdapName searchedTree = new LdapName(env.getProperty("ldap.userstree") + "," + env.getProperty("ldap.treeroot"));
         	rlog.doLog(Level.INFO,"ldap.users", new Object[] {searchedTree.toString()});
@@ -136,16 +134,15 @@ public class POCNexiumController {
             return new ResponseEntity<ArrayList<String>>(strUsers, HttpStatus.OK);
         } catch (NamingException e) {
         	rlog.doLog(Level.WARNING,"ldap.error.search", new Object[] {e.getLocalizedMessage()});
-            e.printStackTrace();
             return new ResponseEntity<ArrayList<String>>(strUsers,HttpStatus.NOT_FOUND);
         } 
     } // getLDAPUsers
     
     
     @GetMapping("/lacv/{policyID}")
-    public ResponseEntity<ArrayList<Hashtable<BigInteger,String>>> getAvailableClearance(@PathVariable String policyID){
-    	RolesLogger.doLog(Level.WARNING,"spif.clearances", new Object[] {policyID.toString()});
-        return new ResponseEntity<ArrayList<Hashtable<BigInteger,String>>>(this.spifi.getClearances(new ASN1ObjectIdentifier(policyID)), HttpStatus.OK);
+    public ResponseEntity<Hashtable<BigInteger,String>> getAvailableClearance(@PathVariable String policyID){
+    	new RolesLogger(className, Level.WARNING, "spif.clearances", new Object[] {policyID.toString()});
+    	return new ResponseEntity<Hashtable<BigInteger,String>>(spifi.getClearances(new ASN1ObjectIdentifier(policyID)), HttpStatus.OK);
     }
 
 
@@ -160,10 +157,6 @@ public class POCNexiumController {
         ArrayList<Hashtable<String,String>> ACList = new ArrayList<Hashtable<String,String>>();
         
 
-        /* for (String[] arr : ACrequests) {
-            System.out.println(Arrays.toString(arr));
-        } */
-
         for(int i=0; i<requests.size(); i++){
             Hashtable<String, String> ACTable = new Hashtable<String,String>();      
             
@@ -172,33 +165,40 @@ public class POCNexiumController {
             ACTable.put("Requestor", requests.get(i)[2]);
             ACTable.put("Start", requests.get(i)[5]);
             ACTable.put("End", requests.get(i)[6]);
-            ACTable.put("Clearance", this.spifi.getName(requests.get(i)[3], requests.get(i)[4]));
+            ACTable.put("Clearance", this.spifi.getName(new ASN1ObjectIdentifier(requests.get(i)[3]), Integer.valueOf(requests.get(i)[4])));
             ACTable.put("PolicyID", requests.get(i)[3]);
             ACTable.put("Description", requests.get(i)[7]);
             
-
             ACList.add(ACTable);
-
-           
         }
 
         return new ResponseEntity<ArrayList<Hashtable<String,String>>>(ACList, HttpStatus.OK);
 
     }
 
-   
+   private ArrayList<Hashtable<String,String>> namingException(Level level, LdapName dName, String errorLabel) {
+	   new RolesLogger(className,level,"ac.getError", new Object[] {errorLabel,dName.toString()});
+       ArrayList<Hashtable<String,String>> errorList = new ArrayList<Hashtable<String,String>>();
+       Hashtable<String, String> errorTable = new Hashtable<String,String>(); 
+       errorTable.put("error", errorLabel);
+       errorList.add(errorTable);
+       return errorList;
+   }
 
     /**
      * Get all the Attribute Certificates of a given user
      * @param entry the LDAP entry of the user 
      */
     @GetMapping("/userAC/{entry}")
-    public ResponseEntity<ArrayList<Hashtable<String,String>>> getACOfUser(@PathVariable String entry){//no JSON there otherwise it can't be a GET request
-        //String entry = (String) payload.get("entry");
-        //LOGGER.info(entry);
-        //System.out.println(entry);
-        List<String> userACs = JndidapAPI.getACOfUser(entry);
-        String[] ACinfoString = new String[6];
+    public ResponseEntity<ArrayList<Hashtable<String,String>>> getACOfUser(@PathVariable LdapName dName){//no JSON there otherwise it can't be a GET request
+    	rlog.doLog(Level.INFO,"ac.get", new Object[] {dName.toString()});
+    	List<String> userACs=null;
+    	try {  userACs = JndidapAPI.getACOfUser(dName); }
+    	catch (NamingException e) {
+    		ArrayList<Hashtable<String,String>> errorList = namingException(Level.INFO,dName,e.getLocalizedMessage());
+    		return new ResponseEntity<ArrayList<Hashtable<String,String>>>(errorList, HttpStatus.INTERNAL_SERVER_ERROR);
+    	}
+
         ArrayList<Hashtable<String,String>> userACList = new ArrayList<Hashtable<String,String>>();
 
         try {
@@ -207,10 +207,9 @@ public class POCNexiumController {
                 Hashtable<String, String> userACTable = new Hashtable<String,String>(); 
                 
                 X509AttributeCertificateHolder ACHolder = new X509AttributeCertificateHolder(ACbyte);
-                //LOGGER.info("Certificate number : " + i);
                 userACTable.put("Start", ACInfo.getStartDate(ACHolder).toString());
                 userACTable.put("End", ACInfo.getEndDate(ACHolder).toString());
-                userACTable.put("Clearance", spifi.getName(ACInfo.getPolicyID(ACHolder).toString(), ACInfo.getClearance(ACHolder).toString()));
+                userACTable.put("Clearance", spifi.getName(ACInfo.getPolicyID(ACHolder), ACInfo.getClearance(ACHolder)));
                 userACTable.put("PolicyID", ACInfo.getPolicyID(ACHolder).toString());
 
                 userACList.add(userACTable);
@@ -218,7 +217,6 @@ public class POCNexiumController {
 
                     return new ResponseEntity<ArrayList<Hashtable<String,String>>>(userACList, HttpStatus.OK);
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                     ArrayList<Hashtable<String,String>> errorList = new ArrayList<Hashtable<String,String>>();
                     Hashtable<String, String> errorTable = new Hashtable<String,String>(); 
@@ -227,76 +225,73 @@ public class POCNexiumController {
                     return new ResponseEntity<ArrayList<Hashtable<String,String>>>(errorList, HttpStatus.EXPECTATION_FAILED);
 
                 }
-            
     }
 
 
     /**
-     * Get the clearances of the policyID in the query of a given user
+     * Get the clearance of the policyID in the query of a given user
      * @param entry the LDAP user entry
+     * @throws NamingException 
      */
-    @GetMapping("/roles/{entry}/{policyID}")
-    public ResponseEntity<ArrayList<String>> getClearanceOfPolicyID(@PathVariable String entry, @PathVariable String policyIdFromRequest){//no JSON there otherwise it can't be a GET request
-        //String entry = (String) payload.get("entry");
-        //LOGGER.info(entry);
-        //System.out.println(entry);
-        List<String> userACs = JndidapAPI.getACOfUser(entry);
-        //List<String> clearanceList = new Vector<String>();
-        //Hashtable<String,String> clearanceHashtable = new Hashtable<>();
-        String clearance;
-        String policyID;
-        ArrayList<String> clearanceList = new ArrayList<String>();
-
-        if(userACs==null) return new ResponseEntity<ArrayList<String>>(HttpStatus.NOT_FOUND);
+    @GetMapping("/roles/{dName}/{policyID}")
+    public ResponseEntity<ArrayList<Hashtable<Integer,String>>> getClearanceOfPolicyID(@PathVariable String dNameStr, @PathVariable String policyIdStr) 
+    		throws NamingException { //no JSON there otherwise it can't be a GET request
+    	rlog.doLog(Level.INFO,"spif.getClearance", new Object[] {dNameStr, policyIdStr});
+    	LdapName dName = new LdapName(dNameStr);
+    	ASN1ObjectIdentifier policyID = new ASN1ObjectIdentifier(policyIdStr);
+    	ArrayList<Hashtable<Integer,String>> result = new ArrayList<Hashtable<Integer,String>>();
+ 
+        for(String ac : JndidapAPI.getACOfUser(dName)) {
+        	int failedVerify = 0;
+        	byte[] ACbyte = Base64.getDecoder().decode(ac.toString());
+        	X509AttributeCertificateHolder ACHolder;
+			try {
+				ACHolder = new X509AttributeCertificateHolder(ACbyte);
+			} catch (IOException e) {
+				rlog.doLog(Level.WARNING,"spif.getClearanceError", new Object[] {dNameStr, policyIdStr});
+				continue;
+			}
+        	if(!(PKCS12ACGenerator.verifyAC(ACHolder, false))) { // incorrect AC
+            	rlog.doLog(Level.WARNING,"ac.verifFailures", new Object[] {});
+            	continue;
+            }
+        	if ((ACInfo.getPolicyID(ACHolder).equals(policyID))) { // found
+        		Hashtable<Integer,String> ht = new Hashtable<Integer,String>();
+        		ht.put(ACInfo.getClearance(ACHolder), spifi.getName(policyID, ACInfo.getClearance(ACHolder)));
+        		result.add(ht);
+        		return new ResponseEntity(result, HttpStatus.OK); 
+        	}
+        }
+        rlog.doLog(Level.WARNING,"spif.getClearanceNotFound", new Object[] {dNameStr, policyIdStr}); // not found
+        return new ResponseEntity(result,HttpStatus.NOT_FOUND);
         
-        else{
-            try {
-                int failedVerify = 0;
-                for(Integer i =0;i<userACs.size(); i++){
-                    byte[] ACbyte = Base64.getDecoder().decode(userACs.get(i));
-                    
-                    X509AttributeCertificateHolder ACHolder = new X509AttributeCertificateHolder(ACbyte);
 
-                    if(PKCS12ACGenerator.verifyAC(ACHolder, false)){
-
-                        clearance =  ACInfo.getClearance(ACHolder).toString();
-                        policyID = ACInfo.getPolicyID(ACHolder);
-                        //clearanceHashtable.put(policyID, clearance);
-                        //System.out.println("Controller : " + clearanceHashtable.values());
-                        if(policyID==policyIdFromRequest){
-                            clearanceList.add(clearance);
-                        }
-                    }
-                    else rlog.doLog(Level.WARNING,"ac.verifFailures", new Object[] {failedVerify++});
-                        
-                } 
-
-                    return new ResponseEntity<ArrayList<String>>(clearanceList, HttpStatus.OK);
-                    
-                    } catch (IOException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    return new ResponseEntity<ArrayList<String>>(HttpStatus.EXPECTATION_FAILED);
-
-                    } 
-            }   
-    }
+} // getClearanceOfPolicyID  
 
 
     /**
      * Get the clearances and policiesID of a given user
      * @param entry the LDAP user entry
      * @return policyID and clearance in HTTP headers
+     * @throws NamingException 
      */
-    @GetMapping("/roles/{entry}")
-    public ResponseEntity<Map<String,Object[]>> getRoles(@PathVariable String entry){//no JSON there otherwise it can't be a GET request
+    @GetMapping("/roles/{dNameStr}")
+    public ResponseEntity<Map<String,Object[]>> getRoles(@PathVariable String dNameStr) //no JSON there otherwise it can't be a GET request
+    		throws NamingException { // NamingException should not be raised
+    	LdapName DName;
+    	try { DName = new LdapName(dNameStr); }
+		catch (InvalidNameException e1) {
+			rlog.doLog(Level.WARNING,"ldap.incorrectDN", new Object[] {dNameStr});
+			e1.printStackTrace();
+			return new ResponseEntity<Map<String, Object[]>>(HttpStatus.NOT_ACCEPTABLE);
+		}
+    	
         MultiValueMap<String,String> multiMap = new LinkedMultiValueMap<String,String>();
         String clearance;
-        String policyID;
-        List<String> userACs = JndidapAPI.getACOfUser(entry);
+        ASN1ObjectIdentifier policyID;
+        List<String> userACs = JndidapAPI.getACOfUser(DName);
         Map<String,Object[]> map = new HashMap<String, Object[]>();
         
-
         if(userACs==null) return new ResponseEntity<Map<String, Object[]>>(HttpStatus.NOT_FOUND);
 
         else{
@@ -309,7 +304,7 @@ public class POCNexiumController {
                     if(PKCS12ACGenerator.verifyAC(ACHolder, false)){
                         clearance =  ACInfo.getClearance(ACHolder).toString();
                         policyID = ACInfo.getPolicyID(ACHolder);
-                        multiMap.add(policyID,clearance);
+                        multiMap.add(policyID.toString(),clearance);
                     }
                     else rlog.doLog(Level.WARNING,"ac.verifFailures", new Object[] {failedVerify++});
                 }
@@ -343,45 +338,52 @@ public class POCNexiumController {
      * @param payload the JSON which contains the data
      */
     @PostMapping("/AC")
-    public ResponseEntity<String> ACRequest(@RequestBody Map<String,String> payload){
-
-        String holderName =(String) payload.get("holderName");
-        String sclear = (String) payload.get("clearance");
-        String debut = (String) payload.get("start");//long value to string
-        String fin = (String) payload.get("end");//long value to string
-        String requestor = (String) payload.get("requestor");
-        String policyID = (String) payload.get("policyID");
-        rlog.doLog(Level.INFO,"spif.acReq",new Object[] {holderName, sclear, debut, fin, requestor, policyID});
-        int clearance = Integer.parseInt(sclear);
-        long ldebut = Long.parseLong(debut);
-        long lfin = Long.parseLong(fin);
-        String descro = (String) payload.get("description");
-
-        
-        //Date debutD = new Date(ldebut);
-        //Date finD = new Date(lfin);
-        
-        int min = 0;
+    public ResponseEntity<String> ACRequest(@RequestBody Map<String,String> payload) {
+    	rlog.doLog(Level.INFO,"spif.acReqStart", new Object[] {});
+    	
+    	int min = 0;
         int max = 1000000;
-
         Integer random_int = (int)Math.floor(Math.random()*(max-min+1)+min);
-
-        String entry = "serialNumber=" + random_int.toString() + ",ou=requests";
+        String strEntry = "serialNumber=" + random_int.toString() + ",ou=requests";
+        LdapName entry, holder, requestor;
+		try {
+			holder = new LdapName((String) payload.get("holderName"));
+			requestor = new LdapName((String) payload.get("requestor"));
+			entry = new LdapName(strEntry);
+		} catch (InvalidNameException e1) {
+			rlog.doLog(Level.WARNING,"ac.badldapname",new Object[] {payload.get("holderName"), payload.get("requestor"), e1.getLocalizedMessage()});
+			e1.printStackTrace();
+			return new ResponseEntity<String>(HttpStatus.NOT_ACCEPTABLE);
+		}
+        
+        int clearance = Integer.parseInt((String) payload.get("clearance"));
+        long start = Long.parseLong((String) payload.get("start"));
+        long end = Long.parseLong((String) payload.get("end"));
+        ASN1ObjectIdentifier policyID = new ASN1ObjectIdentifier((String) payload.get("policyID"));
+        rlog.doLog(Level.FINE,"spif.acReq",new Object[] {holder.toString(), requestor.toString(), policyID.toString(), clearance, start, end});
+        String description = (String) payload.get("description");
 
         try {
-
-            JndidapAPI.addACRequest(entry, holderName, requestor, clearance, policyID, ldebut, lfin, descro);
+        	AttributeCertRequest acr = new AttributeCertRequest (
+        			entry, 
+        			holder, 
+        			requestor, 
+        			clearance, 
+        			policyID, 
+        			start, 
+        			end, 
+        			description);
+        	rlog.doLog(Level.FINE,"spif.acReqOK",new Object[] {});
             return new ResponseEntity<String>( HttpStatus.CREATED);
-            
-        } catch (NamingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-
-            //ACRequest(payload);//in case the UID already exists, it is randomized again until one which doesn't exist is found
-            return new ResponseEntity<String>( HttpStatus.CREATED);
-
-        }
-
+        } catch (IOException e) {
+        	rlog.doLog(Level.WARNING,"ac.ioerror",new Object[] {e.getLocalizedMessage()});
+			e.printStackTrace();
+			return new ResponseEntity<String>( HttpStatus.INTERNAL_SERVER_ERROR);
+		} catch (NamingException e) {
+			rlog.doLog(Level.WARNING,"ac.namingerror",new Object[] {e.getLocalizedMessage()});
+			e.printStackTrace();
+			return new ResponseEntity<String>( HttpStatus.BAD_REQUEST);
+		}
     }
 
 
@@ -518,5 +520,12 @@ public class POCNexiumController {
 
     }
 
-
+    @GetMapping("/test")
+    public ResponseEntity<String> test(@RequestBody Map<String,Object> payload) {
+    	rlog.doLog(Level.INFO,"spif.test",new Object[] {});
+    	String value = (String) payload.get("value");
+    	rlog.doLog(Level.INFO,"spif.test.value",new Object[] {value});
+    	
+    	return new ResponseEntity<String>(HttpStatus.OK);
+    } // test
 }

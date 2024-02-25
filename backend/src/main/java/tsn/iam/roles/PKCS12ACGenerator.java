@@ -212,7 +212,6 @@ public class PKCS12ACGenerator {
         this.acInfoGen = new V2AttributeCertificateInfoGenerator();
         this.extGenerator = new ExtensionsGenerator();
         this.holderName = new X500Name(holder);
-        PrivateKey key = getKey();
         //PrivateKey key = getSignaKey();
         X509Certificate caCert = (X509Certificate) this.keystore.getCertificate(alias);
         //X509Certificate caCert = getCertifSigna();
@@ -432,9 +431,9 @@ public class PKCS12ACGenerator {
 
             DERBitString derClassList = new DERBitString(ACInfo.getClearance(acHolder));
             //Attention : la variable suivante ne peut pas commencer par un chiffre supérieur à 2 ou erreur car ASN1ObjectIdentifier ne le considèrera pas comme un OID
-            ASN1ObjectIdentifier oid = new ASN1ObjectIdentifier(ACInfo.getPolicyID(acHolder));//new ASN1ObjectIdentifier("1.3.26.1.3.1"); 
+
             ASN1EncodableVector envec = new ASN1EncodableVector();
-            envec.add(oid);
+            envec.add(ACInfo.getPolicyID(acHolder));
             envec.add(derClassList);
             DERSequence derSequence = new DERSequence(envec);
 

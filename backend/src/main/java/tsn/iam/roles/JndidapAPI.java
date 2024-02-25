@@ -146,54 +146,36 @@ public class JndidapAPI {
      * Get all the Attribute Certificates of a given user
      * @param entry the LDAP user entry
      * @return ACs as Base64 string
+     * @throws NamingException 
      */
-    public static List<String> getACOfUser(String entry){//pour l'isntant basé sur ACCOUNT car uniquement UID comme attriut MUST
+    public static List<String> getACOfUser(LdapName dName) throws NamingException {//pour l'instant basé sur ACCOUNT car uniquement UID comme attriut MUST
 
-        String searchFilter = "(objectClass=pmiUser)";//on ne veut chercher que les objets de ce type de classe, ATTENTION si la classe parent (le user) est un pmiUSER,
+        //on ne veut chercher que les objets de ce type de classe, ATTENTION si la classe parent (le user) est un pmiUSER,
         //ca ne fonctionnera pas parce que le programme cherchera dans l'objet du user au lieu de ses enfants.
-        String[] requiredAttributes = { AC_STRING };
-
         SearchControls controls = new SearchControls();
         controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-        controls.setReturningAttributes(requiredAttributes);
-
+        controls.setReturningAttributes(new String[] { AC_STRING });
         NamingEnumeration ACData;
-
-        try {
-            ACData = ctx.search(entry, searchFilter, controls);//liste tout ce qui est en dessous de entry selon requiredAttributes
-
-            //SearchResult result = null;
-            List<String> base64ListOfACasString = new Vector<String>();
-            
-            
-
-            while(ACData.hasMore()){
+        
+        // Retrieve all certificates for a given user
+        ACData = ctx.search(dName.toString(), "(objectClass=pmiUser)", controls);
+        List<String> base64ListOfACasString = new Vector<String>();
+        while(ACData.hasMore()) {
                 SearchResult result = (SearchResult) ACData.next();
                 Attributes attr = result.getAttributes();
-                for(NamingEnumeration ae = attr.getAll(); ae.hasMore();){
+                for(NamingEnumeration ae = attr.getAll(); ae.hasMore();) { // for all ACs found...
                     Attribute at = (Attribute) ae.next();
-                    System.out.println(at.getID());
+                    rlog.doLog(Level.FINER, "ldap.attrId", new Object[] {at.getID()});
                     NamingEnumeration e = at.getAll();
                     while(e.hasMore()){
                         byte[] ACbyte = (byte[]) e.next();
                         base64ListOfACasString.add(Base64.getEncoder().encodeToString(ACbyte));
-                    }
-                }
-                
-            }
-            LOGGER.info("ACs returned : " + base64ListOfACasString);
-
-            return base64ListOfACasString;
-
-        } catch (NamingException e) {
-            System.out.println(e);
-            e.printStackTrace();
-            // TODO: handle exception
-        }
-
-        return null;
-
-    }
+                    } // while
+                } // for
+        } // while
+        rlog.doLog(Level.FINE, "ldap.attrCert", new Object[] {base64ListOfACasString});
+        return base64ListOfACasString; // a list of a giver user's AC's...
+} // getACOfUser
 
 
 
@@ -341,59 +323,11 @@ public static String[] getACRequest(String entry){
      * @param description description of the request
      * @throws NamingException
      */
-    public static void addACRequest(String entry, String holder, String requestor, int clearance, String policyID, long startMillis, long endMillis, String description) throws NamingException {
-
-        LOGGER.info("Adding new Attribute Certificate request at " + entry);
-
-        //Holder, demandeur, clearance, début, fin, serialNumber 
-        DERBitString derClassList = new DERBitString(clearance);
-        DERGeneralizedTime start = new DERGeneralizedTime(new Date(startMillis));
-        DERGeneralizedTime end = new DERGeneralizedTime(new Date(endMillis));
-        //Attention : la variable suivante ne peut pas commencer par un chiffre supérieur à 2 ou erreur car ASN1ObjectIdentifier ne le considèrera pas comme un OID
-        ASN1ObjectIdentifier oid = new ASN1ObjectIdentifier(policyID);//new ASN1ObjectIdentifier("1.3.26.1.3.1"); 
-        ASN1EncodableVector envec = new ASN1EncodableVector();
-        envec.add(oid);
-        envec.add(derClassList);
-        DERSequence derSequence = new DERSequence(envec);
-
-        /* System.out.println(start.getTimeString());
-        System.out.println("seq :" + derSequence); */
-
-
-        try {
-            Attributes attributes = new BasicAttributes();
-            Attribute clearanceRequest = new BasicAttribute(OBJECTCLASS_STRING, CLEARANCE_REQUEST_STRING);
-            //Attribute pmiUser = new BasicAttribute(OBJECTCLASS_STRING, PMIUSER_STRING);
-            Attribute top = new BasicAttribute(OBJECTCLASS_STRING, TOP_STRING);
-            Attribute clearancAttribute = new BasicAttribute(CLEARANCE_STRING, derSequence.getEncoded());
-            Attribute startAttribute = new BasicAttribute(NOT_BEFORE_STRING, start.getTimeString());
-            Attribute endAttribute = new BasicAttribute(NOT_AFTER_STRING, end.getTimeString());
-            Attribute reqAttribute = new BasicAttribute(REQUESTOR_STRING, requestor);
-            Attribute holdAttribute = new BasicAttribute(HOLDER_STRING, holder);
-            Attribute descrAttribute = new BasicAttribute(DESCRIPTION_STRING,description);
-            
-            attributes.put(clearanceRequest);    
-            attributes.put(clearancAttribute);
-            attributes.put(descrAttribute);
-            attributes.put(startAttribute);
-            attributes.put(endAttribute);
-            attributes.put(reqAttribute);
-            attributes.put(holdAttribute);
-            
-
-        
+    public static void addACRequest(LdapName entry, Attributes attributes) throws NamingException {
             ctx.createSubcontext(entry, attributes);
-
             ModificationItem[] item = new ModificationItem[1];
-            item[0] = new ModificationItem(DirContext.ADD_ATTRIBUTE, top);
-
+            item[0] = new ModificationItem(DirContext.ADD_ATTRIBUTE, new BasicAttribute("objectClass", "top"));
             ctx.modifyAttributes(entry, item);
-
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
     }
 
 

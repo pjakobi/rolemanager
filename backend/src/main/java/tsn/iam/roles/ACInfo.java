@@ -3,6 +3,7 @@ package tsn.iam.roles;
 import java.io.IOException;
 import java.security.KeyStoreException;
 import java.util.Base64;
+import java.util.ResourceBundle;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,10 @@ import org.bouncycastle.cert.X509AttributeCertificateHolder;
 
 public class ACInfo {
 
-    private static final Logger LOGGER = Logger.getLogger( ACInfo.class.getName() );
-    //private static final ConsoleHandler consoleHandler = new ConsoleHandler();
 
-
+	private static RolesLogger rlog=new RolesLogger(ACInfo.class.getName());
+	final ResourceBundle bundle = ResourceBundle.getBundle("messages");
+	
     public static X500Principal getIssuer(X509AttributeCertificateHolder ACHolder) throws KeyStoreException, IOException{
         AttributeCertificateIssuer issuer = ACHolder.getIssuer();
 
@@ -35,8 +36,7 @@ public class ACInfo {
     public static X500Name getHolder(X509AttributeCertificateHolder ACHolder){
         X500Name[] holders = ACHolder.getHolder().getEntityNames();
         X500Name holderName = holders[0];
-        LOGGER.info(holderName.toString());
-        //System.out.println(holderName);
+        rlog.doLog(Level.FINE,"ac.holder", new Object[] {holderName.toString()});
         return holderName;
     } 
 
@@ -47,61 +47,52 @@ public class ACInfo {
      */
     public static Integer getClearance(X509AttributeCertificateHolder ACHolder){
         Attribute[] attribs = ACHolder.getAttributes();
-        LOGGER.info("getClearance : cert has " + attribs.length + " attributes:");
-        //System.out.println("cert has " + attribs.length + " attributes:");
+        rlog.doLog(Level.FINE,"ac.clearance", new Object[] {attribs.length});
 
-
-        for (int i = 0; i < attribs.length; i++)
+        for (Attribute clearance: attribs)
         {
-            Attribute clearance = attribs[i];
-            LOGGER.info("getClearance : OID: " + clearance.getAttrType());
-            //System.out.println("OID: " + clearance.getAttrType());
-            
-            LOGGER.info("getClearance : policyID and classList : " + clearance.getAttrValues().toString());
-            //System.out.println( clearance.getAttrValues());
-            
+            rlog.doLog(Level.FINE,"ac.clearance.details", new Object[] {clearance.getAttrType(), clearance.getAttrValues().toString()});
+
             // We check for the presence of a "Clearance" attribute
             ASN1ObjectIdentifier oidclearance = new ASN1ObjectIdentifier("2.5.1.5.55");
-            if (clearance.getAttrType().equals(oidclearance)){
-                LOGGER.info("getClearance : clearance read from cert");
-                //System.out.println("clearance read form cert!");
+            if (clearance.getAttrType().equals(oidclearance)) {
+            	rlog.doLog(Level.FINE,"ac.clearance.found", new Object[] {});
                 String subStringClearance = clearance.getAttrValues().toString().substring(clearance.getAttrValues().toString().lastIndexOf("0"), clearance.getAttrValues().toString().lastIndexOf("]") - 1);
                 Integer subBit = Integer.parseInt(subStringClearance,16);
                 return subBit;
             }
         }
-
         return -1;
-    
     }
 
 
-    public static String getPolicyID(X509AttributeCertificateHolder ACHolder){
+    public static ASN1ObjectIdentifier getPolicyID(X509AttributeCertificateHolder ACHolder){
 
         Attribute[] attribs = ACHolder.getAttributes();
-        LOGGER.info("getPolicyID : cert has " + attribs.length + " attributes");
-        //System.out.println("cert has " + attribs.length + " attributes:");
-
-
-        for (int i = 0; i < attribs.length; i++)
-        {
-            Attribute clearance = attribs[i];
-            LOGGER.info("getPolicyID : OID: " + clearance.getAttrType());
-            LOGGER.info("getPolicyID : policyID and classList : " + clearance.getAttrValues().toString());
-            
-            // We check for the presence of a "Clearance" attribute
-            ASN1ObjectIdentifier oidclearance = new ASN1ObjectIdentifier("2.5.1.5.55");
-            if (clearance.getAttrType().equals(oidclearance)){
-                LOGGER.info("getPolicyID : clearance read from cert");
-                String subStringPolicyID = clearance.getAttrValues().toString().substring(clearance.getAttrValues().toString().lastIndexOf("[") + 1, clearance.getAttrValues().toString().lastIndexOf(","));
-                
-                return subStringPolicyID;
-            }
+        rlog.doLog(Level.FINE,"ac.clearance", new Object[] {attribs.length});
+        
+        ASN1ObjectIdentifier oidclearance = new ASN1ObjectIdentifier("2.5.1.5.55");
+        for(Attribute clearance : attribs) {
+        	rlog.doLog(Level.FINE,"ac.clearance.details", new Object[] {clearance.getAttrType(), clearance.getAttrValues().toString()});
+        	if (!clearance.getAttrType().equals(oidclearance)) continue;
+        	rlog.doLog(Level.FINER,"ac.policy.found", new Object[] {});
+        	return new ASN1ObjectIdentifier(clearance.getAttrValues().toString().substring(clearance.getAttrValues().toString().lastIndexOf("[") + 1, clearance.getAttrValues().toString().lastIndexOf(",")));
         }
-
-        return "Not found";
-
-    }
+        return null;
+    } // getPolicyID
+    
+    public static Integer getPolicyID(X509AttributeCertificateHolder ACHolder, ASN1ObjectIdentifier policyID) {
+    	rlog.doLog(Level.FINE,"ac.clearance", new Object[] {policyID.toString()});
+    	Attribute[] attribs = ACHolder.getAttributes();
+    	for(Attribute clearance : attribs) {
+    		if (!clearance.getAttrType().equals(new ASN1ObjectIdentifier("2.5.1.5.55"))) continue; // not a clearance
+    		clearance.getAttrValues();
+    	} // for clearance
+        
+        return -1;
+    } // getPolicyID
+    
+    
 
     public static String getStartDate(X509AttributeCertificateHolder ACHolder){
         return ACHolder.getNotBefore().toString();
