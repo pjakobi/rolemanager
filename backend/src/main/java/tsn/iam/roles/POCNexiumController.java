@@ -26,11 +26,13 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger; // SEVERE, WARNING, INFO, CONFIG, FINE, FINER, FINEST
 import java.net.InetAddress;
@@ -117,17 +119,17 @@ public class POCNexiumController {
        this.spifi = new SpifDir(spifPath); 
     }
 
-
-    
-
+    // Get user's DNs
     @GetMapping("/users")
     public ResponseEntity<ArrayList<String>> getLDAPUsers() {
+    	new RolesLogger(className, Level.INFO, "spif.users", new Object[] {});
     	ArrayList<String> strUsers = new ArrayList<String>();
         try {
         	LdapName searchedTree = new LdapName(env.getProperty("ldap.userstree") + "," + env.getProperty("ldap.treeroot"));
-        	rlog.doLog(Level.INFO,"ldap.users", new Object[] {searchedTree.toString()});
+        	rlog.doLog(Level.FINE,"ldap.users", new Object[] {searchedTree.toString()});
             ArrayList<LdapName> users = JndidapAPI.getUsers(searchedTree);
             for (LdapName index : users) strUsers.add(index.toString());
+            new RolesLogger(className, Level.FINE, "spif.users.ok", new Object[] {});
             return new ResponseEntity<ArrayList<String>>(strUsers, HttpStatus.OK);
         } catch (NamingException e) {
         	rlog.doLog(Level.WARNING,"ldap.error.search", new Object[] {e.getLocalizedMessage()});
@@ -135,11 +137,19 @@ public class POCNexiumController {
         } 
     } // getLDAPUsers
     
+    // Get all policies object id
+    @GetMapping("/policies")
+    public ResponseEntity<Set<ASN1ObjectIdentifier>> getPolicies() {
+    	new RolesLogger(className, Level.INFO, "spif.getPolicies", new Object[] {});
+    	Set<ASN1ObjectIdentifier> policies = spifi.getPolicies();
+    	return new ResponseEntity<Set<ASN1ObjectIdentifier>> (policies,HttpStatus.OK); 
+    } // getPolicies
     
     @GetMapping("/lacv/{policyID}")
-    public ResponseEntity<Hashtable<BigInteger,String>> getAvailableClearance(@PathVariable String policyID){
-    	new RolesLogger(className, Level.WARNING, "spif.clearances", new Object[] {policyID.toString()});
-    	return new ResponseEntity<Hashtable<BigInteger,String>>(spifi.getClearances(new ASN1ObjectIdentifier(policyID)), HttpStatus.OK);
+    public ResponseEntity<Map<BigInteger,String>> getAvailableClearance(@PathVariable String policyID){
+    	new RolesLogger(className, Level.INFO, "spif.clearances", new Object[] {policyID.toString()});
+    	Map<BigInteger,String> map = spifi.getClearances(new ASN1ObjectIdentifier(policyID));
+    	return new ResponseEntity<Map<BigInteger,String>>(map, HttpStatus.OK);
     }
 
 
@@ -162,7 +172,7 @@ public class POCNexiumController {
             ACTable.put("Requestor", requests.get(i)[2]);
             ACTable.put("Start", requests.get(i)[5]);
             ACTable.put("End", requests.get(i)[6]);
-            ACTable.put("Clearance", this.spifi.getName(new ASN1ObjectIdentifier(requests.get(i)[3]), Integer.valueOf(requests.get(i)[4])));
+            //ACTable.put("Clearance", this.spifi.getName(new ASN1ObjectIdentifier(requests.get(i)[3]), Integer.valueOf(requests.get(i)[4])));
             ACTable.put("PolicyID", requests.get(i)[3]);
             ACTable.put("Description", requests.get(i)[7]);
             
@@ -206,7 +216,7 @@ public class POCNexiumController {
                 X509AttributeCertificateHolder ACHolder = new X509AttributeCertificateHolder(ACbyte);
                 userACTable.put("Start", ACInfo.getStartDate(ACHolder).toString());
                 userACTable.put("End", ACInfo.getEndDate(ACHolder).toString());
-                userACTable.put("Clearance", spifi.getName(ACInfo.getPolicyID(ACHolder), ACInfo.getClearance(ACHolder)));
+                //userACTable.put("Clearance", spifi.getName(ACInfo.getPolicyID(ACHolder), ACInfo.getClearance(ACHolder)));
                 userACTable.put("PolicyID", ACInfo.getPolicyID(ACHolder).toString());
 
                 userACList.add(userACTable);
@@ -254,7 +264,7 @@ public class POCNexiumController {
             }
         	if ((ACInfo.getPolicyID(ACHolder).equals(policyID))) { // found
         		Hashtable<Integer,String> ht = new Hashtable<Integer,String>();
-        		ht.put(ACInfo.getClearance(ACHolder), spifi.getName(policyID, ACInfo.getClearance(ACHolder)));
+        		//ht.put(ACInfo.getClearance(ACHolder), spifi.getName(policyID, ACInfo.getClearance(ACHolder)));
         		result.add(ht);
         		return new ResponseEntity(result, HttpStatus.OK); 
         	}
@@ -517,10 +527,9 @@ public class POCNexiumController {
     }
 
     @GetMapping("/test")
-    public ResponseEntity<String> test(@RequestBody Map<String,Object> payload) {
+    public ResponseEntity<String> test() {
     	rlog.doLog(Level.INFO,"spif.test",new Object[] {});
-    	String value = (String) payload.get("value");
-    	rlog.doLog(Level.INFO,"spif.test.value",new Object[] {value});
+    	rlog.doLog(Level.FINE,"spif.test.ok",new Object[] {});
     	
     	return new ResponseEntity<String>(HttpStatus.OK);
     } // test

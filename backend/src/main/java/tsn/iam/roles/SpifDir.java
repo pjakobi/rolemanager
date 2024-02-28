@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import org.xmlspif.spif.SPIF;
@@ -31,34 +33,37 @@ import java.text.MessageFormat;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 
 public class SpifDir {
-    private static Properties conf;
-        
-    private static Map<ASN1ObjectIdentifier,Hashtable<BigInteger,String>> spifMap = new HashMap<ASN1ObjectIdentifier,Hashtable<BigInteger,String>>();
-    private static Map<String,String> descriptions = new HashMap<String,String>(); // LACV, label
+ 
+    
+
     private static final String className = SpifDir.class.getName();
     private static final Logger LOGGER = Logger.getLogger( className );
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private final RolesLogger rlog=new RolesLogger(className);
-    
-    private Set<spifFile> dir = new HashSet<>();
-    private Set<ASN1ObjectIdentifier> policies = new HashSet<ASN1ObjectIdentifier>();
+    private HashMap<ASN1ObjectIdentifier,SpifFile> spifMap = new HashMap<ASN1ObjectIdentifier,SpifFile>();
     
     // Inspect the SPIF Directory
     public SpifDir(String spifPath) throws JAXBException,InvalidPathException, IOException {
     	rlog.doLog(Level.INFO, "spif.path",new Object[] {spifPath});  	
-    	try {
-    		Files.list(Paths.get(spifPath)).forEach(file -> { // every file in spifPath 
-    			rlog.doLog(Level.INFO, "spif.loaded", new Object[] {file.getFileName()});
-    			try {
-    				spifFile myFile = new spifFile(spifPath + "/" + file.getFileName());
-   					if (!(checkDuplicate(myFile.getPolicyId(), myFile.getFileName()))) dir.add(myFile); 
-    				
-    		} catch (JAXBException e) { } // logged in spifData - do nothing else
-    		}); 
-    	} catch (IOException e) {
-    		rlog.doLog(Level.FINE,"spif.readDirErr", new Object[] {spifPath, e.getLocalizedMessage()});
-    		throw new IOException(rlog.toString("spif.readDirErr",new Object[] {spifPath, e.getLocalizedMessage()}));
-    	} 
+   		
+   		for (File file : new File(spifPath).listFiles()) {	 				
+ 			try { 
+ 				SpifFile spifFile = new SpifFile(spifPath, file.getName()); 
+ 				if (spifMap.containsKey(spifFile.getPolicyId())) {
+ 					rlog.doLog(Level.INFO, "spif.duplicate",new Object[] {spifFile.getPolicyId(), file.getName()}); 
+ 					continue;
+ 				}
+ 				spifMap.put(spifFile.getPolicyId(),spifFile);
+ 				rlog.doLog(Level.INFO,"spif.loaded", new Object[] {spifFile.getPolicyId(), file.getName()});
+ 			}  catch (JAXBException e) { continue; } // skip to next file; log elsewhere
+    	} // for
+   		
+
+   		for (ASN1ObjectIdentifier oid: spifMap.keySet()) {
+   			SpifFile spif = spifMap.get(oid);
+   			rlog.doLog(Level.FINE,"spif.dirDebug", new Object[] {oid, spifMap.get(oid), spifMap.size()});
+   		}
+   			
     } // SpifInfo
 
   
@@ -74,33 +79,34 @@ public class SpifDir {
 //        return "null";
 //    }
 
-    public Boolean checkDuplicate(ASN1ObjectIdentifier policy, String fileName) {
-    	rlog.doLog(Level.FINE,"spif.checkDuplicate", new Object[] {policy,fileName});
 
-    	if (policies.contains(policy)) { // Duplicate
-    		rlog.doLog(Level.WARNING,"spif.duplicate", new Object[] {policy, fileName});
-    		return true;
-    	} else {
-    		policies.add(policy);
-    		return false;
+
+//    public String getName(ASN1ObjectIdentifier policyID, Integer lacv){
+//    	rlog.doLog(Level.FINE,"spif.getName", new Object[] {policyID,lacv});
+//    	BigInteger lacv = spifMap.get(policyID);
+//    	if (ht != null) {
+//    		String clearance = ht.get(lacv.toString());
+//    		if (clearance != null) {    			
+//    			rlog.doLog(Level.FINE,"spif.getName.ok", new Object[] {clearance});
+//    			return clearance;
+//    		}
+//   	}
+//    	rlog.doLog(Level.FINE,"spif.getName.nok", new Object[] {});
+//    	return null; // policy or Lacv not found
+//    } // getName
+
+    public Set<ASN1ObjectIdentifier> getPolicies() {
+    	Set<ASN1ObjectIdentifier> result = new HashSet<ASN1ObjectIdentifier>();
+    	for (ASN1ObjectIdentifier oid: spifMap.keySet()) {
+    		rlog.doLog(Level.INFO,"spif.getPoliciesDetails", new Object[] {oid.toString(),spifMap.get(oid) });
+    		result.add(oid);
     	}
-    } // checkDuplicate
-
-    public String getName(ASN1ObjectIdentifier policyID, Integer lacv){
-    	rlog.doLog(Level.FINE,"spif.getName", new Object[] {policyID,lacv});
-    	Hashtable<BigInteger,String> ht = spifMap.get(policyID);
-    	if (ht != null) {
-    		String clearance = ht.get(lacv.toString());
-    		if (clearance != null) {    			
-    			rlog.doLog(Level.FINE,"spif.getName.ok", new Object[] {clearance});
-    			return clearance;
-    		}
-    	}
-    	rlog.doLog(Level.FINE,"spif.getName.nok", new Object[] {});
-    	return null; // policy or Lacv not found
-    } // getName
-
-
-    public Hashtable<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { return spifMap.get(policyID); }
+    	return result;
+    }
+    
+    
+    
+    public Map<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { return spifMap.get(policyID).getClassifications(); } // 	getClearances
+    	
 
 }
