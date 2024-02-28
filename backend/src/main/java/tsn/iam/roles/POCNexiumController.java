@@ -139,10 +139,10 @@ public class POCNexiumController {
     
     // Get all policies object id
     @GetMapping("/policies")
-    public ResponseEntity<Set<ASN1ObjectIdentifier>> getPolicies() {
+    public ResponseEntity<Set<SpifDescriptor>> getPolicies() { // File name, obj. id, policy name
     	new RolesLogger(className, Level.INFO, "spif.getPolicies", new Object[] {});
-    	Set<ASN1ObjectIdentifier> policies = spifi.getPolicies();
-    	return new ResponseEntity<Set<ASN1ObjectIdentifier>> (policies,HttpStatus.OK); 
+    	new RolesLogger(className, Level.INFO, "spif.getPolicies.ok", new Object[] {});
+    	return new ResponseEntity<Set<SpifDescriptor>> (spifi.getDescriptors(),HttpStatus.OK);   	
     } // getPolicies
     
     @GetMapping("/lacv/{policyID}")

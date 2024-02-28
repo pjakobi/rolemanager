@@ -40,7 +40,7 @@ public class SpifDir {
     private static final Logger LOGGER = Logger.getLogger( className );
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private final RolesLogger rlog=new RolesLogger(className);
-    private HashMap<ASN1ObjectIdentifier,SpifFile> spifMap = new HashMap<ASN1ObjectIdentifier,SpifFile>();
+    private Set<SpifDescriptor> descriptors = new HashSet<SpifDescriptor>();
     
     // Inspect the SPIF Directory
     public SpifDir(String spifPath) throws JAXBException,InvalidPathException, IOException {
@@ -48,21 +48,22 @@ public class SpifDir {
    		
    		for (File file : new File(spifPath).listFiles()) {	 				
  			try { 
- 				SpifFile spifFile = new SpifFile(spifPath, file.getName()); 
- 				if (spifMap.containsKey(spifFile.getPolicyId())) {
- 					rlog.doLog(Level.INFO, "spif.duplicate",new Object[] {spifFile.getPolicyId(), file.getName()}); 
- 					continue;
+ 				SpifFile spifFile = new SpifFile(spifPath, file.getName());
+ 				SpifDescriptor descr = new SpifDescriptor(spifFile.getPolicyId(),spifFile.getPolicyName(),spifFile.getFileName());
+ 				
+ 				for (SpifDescriptor index: descriptors) {
+ 					if (index.equals(spifFile.getPolicyId())) { // duplicate object id
+ 						rlog.doLog(Level.INFO, "spif.duplicate",new Object[] {spifFile.getPolicyId(), file.getName()});
+ 						continue;
+ 					}
  				}
- 				spifMap.put(spifFile.getPolicyId(),spifFile);
- 				rlog.doLog(Level.INFO,"spif.loaded", new Object[] {spifFile.getPolicyId(), file.getName()});
+ 				
+ 				new RolesLogger(className, Level.FINE, "spif.noDuplicate", new Object[] { spifFile.getPolicyId(),spifFile.getFileName() }); 
+ 				descriptors.add(descr);
+ 				
+ 				rlog.doLog(Level.INFO,"spif.loaded", new Object[] {spifFile.getPolicyId(), spifFile.getPolicyName(), spifFile.getFileName()});
  			}  catch (JAXBException e) { continue; } // skip to next file; log elsewhere
     	} // for
-   		
-
-   		for (ASN1ObjectIdentifier oid: spifMap.keySet()) {
-   			SpifFile spif = spifMap.get(oid);
-   			rlog.doLog(Level.FINE,"spif.dirDebug", new Object[] {oid, spifMap.get(oid), spifMap.size()});
-   		}
    			
     } // SpifInfo
 
@@ -95,18 +96,12 @@ public class SpifDir {
 //    	return null; // policy or Lacv not found
 //    } // getName
 
-    public Set<ASN1ObjectIdentifier> getPolicies() {
-    	Set<ASN1ObjectIdentifier> result = new HashSet<ASN1ObjectIdentifier>();
-    	for (ASN1ObjectIdentifier oid: spifMap.keySet()) {
-    		rlog.doLog(Level.INFO,"spif.getPoliciesDetails", new Object[] {oid.toString(),spifMap.get(oid) });
-    		result.add(oid);
-    	}
-    	return result;
-    }
     
+    public Map<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { 
+    	Map<BigInteger,String> map = new HashMap<BigInteger,String>();
+    	return map;
+    	//return spifMap.get(policyID).getClassifications(); 
+    } // 	getClearances
     
-    
-    public Map<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { return spifMap.get(policyID).getClassifications(); } // 	getClearances
-    	
-
+    public Set<SpifDescriptor> getDescriptors() { return this.descriptors; }
 }

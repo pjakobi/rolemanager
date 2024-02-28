@@ -41,7 +41,7 @@ public class SpifFile {
     		
     		spif.getSecurityClassifications().getSecurityClassification().forEach(classif -> {
     			classifications.put(classif.getLacv(), classif.getName());
-    			rlog.doLog(Level.FINE, "spif.classif", new Object[] {policyId.toString(),classif.getLacv(),classif.getName()});
+    			rlog.doLog(Level.FINER, "spif.classif", new Object[] {policyId.toString(),classif.getLacv(),classif.getName()});
     		});
 			rlog.doLog(Level.FINE, "spif.decoded", new Object[] {fileName});
     	} catch (JAXBException e) { 
@@ -61,4 +61,7 @@ public class SpifFile {
 		return false;
 	}
 	public Map<BigInteger,String> getClassifications() { return this.classifications; }
+
+		
+	
 } // class
