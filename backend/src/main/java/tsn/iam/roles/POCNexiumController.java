@@ -60,6 +60,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.xml.bind.JAXBException;
@@ -145,14 +147,14 @@ public class POCNexiumController {
     	return new ResponseEntity<Set<SpifDescriptor>> (spifi.getDescriptors(),HttpStatus.OK);   	
     } // getPolicies
     
-    @GetMapping("/lacv/{policyID}")
-    public ResponseEntity<Map<BigInteger,String>> getAvailableClearance(@PathVariable String policyID){
-    	new RolesLogger(className, Level.INFO, "spif.clearances", new Object[] {policyID.toString()});
-    	Map<BigInteger,String> map = spifi.getClearances(new ASN1ObjectIdentifier(policyID));
-    	return new ResponseEntity<Map<BigInteger,String>>(map, HttpStatus.OK);
-    }
-
-
+    @GetMapping("/policies/{oid}")
+    public ResponseEntity<Map<BigInteger,String>> getAvailableClearance(@PathVariable("oid") String oid) throws JAXBException, FileNotFoundException {
+    	new RolesLogger(className, Level.INFO, "spif.clearances", new Object[] {oid});
+   		Map<BigInteger,String> map =  spifi.getClearances(new ASN1ObjectIdentifier(oid));
+   		new RolesLogger(className, Level.INFO, "spif.clearances.ok", new Object[] {oid});
+   		return new ResponseEntity(map,HttpStatus.OK);
+    } // getAvailableClearance
+    
     /**
      * Get all the pending Attribute Certificate requests
      */

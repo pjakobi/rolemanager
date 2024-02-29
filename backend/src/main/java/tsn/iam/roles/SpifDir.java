@@ -41,10 +41,12 @@ public class SpifDir {
     private final ResourceBundle bundle = ResourceBundle.getBundle("messages"); //default locale
     private final RolesLogger rlog=new RolesLogger(className);
     private Set<SpifDescriptor> descriptors = new HashSet<SpifDescriptor>();
+    private String spifPath;
     
     // Inspect the SPIF Directory
     public SpifDir(String spifPath) throws JAXBException,InvalidPathException, IOException {
     	rlog.doLog(Level.INFO, "spif.path",new Object[] {spifPath});  	
+   		this.spifPath = spifPath;
    		
    		for (File file : new File(spifPath).listFiles()) {	 				
  			try { 
@@ -97,10 +99,22 @@ public class SpifDir {
 //    } // getName
 
     
-    public Map<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) { 
+    public Map<BigInteger,String> getClearances(ASN1ObjectIdentifier policyID) throws JAXBException, FileNotFoundException { 
     	Map<BigInteger,String> map = new HashMap<BigInteger,String>();
-    	return map;
-    	//return spifMap.get(policyID).getClassifications(); 
+    	SpifFile spifFile = null;
+    	for (SpifDescriptor descr: descriptors) {
+    		if (!(descr.getOid().equals(policyID))) continue;
+    		try { spifFile = new SpifFile(spifPath, descr.getFile()); }
+    		catch (JAXBException e) { 
+    			String msg = new MessageFormat(bundle.getString("spif.jaxbErr")).format(new Object[] {policyID, e.getLocalizedMessage()});
+    			rlog.doLog(Level.WARNING,"spif.jaxbErr", new Object[] { policyID,e.getLocalizedMessage() });
+    			throw new JAXBException(msg);
+    		}  // catch
+    		return spifFile.getClassifications();
+    	} // for
+    	// Oid not found in descriptors
+    	rlog.doLog(Level.WARNING,"spif.getName.nok", new Object[] {policyID});
+    	throw new FileNotFoundException(new MessageFormat(bundle.getString("spif.getName.nok")).format(new Object[] {policyID}));
     } // 	getClearances
     
     public Set<SpifDescriptor> getDescriptors() { return this.descriptors; }
