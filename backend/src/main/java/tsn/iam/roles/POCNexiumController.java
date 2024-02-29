@@ -72,10 +72,10 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 @RestController
 public class POCNexiumController {
 	private InetAddress server=null;
-    private final Integer port;
+    private final Integer port=389;
     private LdapName treeroot=null;
-    private LdapName login=null;
-    private final String password;
+    private LdapName bindDn=null;
+    private final String password="";
 
     private SpifDir spifi;
     private static final String className = POCNexiumController.class.getName();
@@ -83,39 +83,15 @@ public class POCNexiumController {
     @Autowired Environment env;
 	//private String ACTable.put;
     
-    POCNexiumController(@Value("${ldap.server}") String server,
-                        @Value("${ldap.port}") String port,
-                        @Value("${ldap.treeroot}") String treeroot,
-                        @Value("${ldap.login}") String login,
-                        @Value("${ldap.password}") String password,
-                        @Value("${spif.path}") String spifPath,
-                        @Value("${ldap.userstree") String spifPeopleSubtree
-                        ) throws NamingException, InvalidPathException, JAXBException, IOException
+    POCNexiumController( @Value("${ldap.file}") String ldapConfigFilename, @Value("${ldap.pwfile}") String pwFname, @Value("${spif.path}") String spifPath ) 
+    		throws NamingException, InvalidPathException, JAXBException, IOException
     {
+    	LdapConfig cfg = new LdapConfig(ldapConfigFilename, pwFname); // /etc/openldap/ldap.conf	
     	
-        // With InetAddress.getByName, we get host name/IP 
-        try { this.server = InetAddress.getByName(server); } // host name/IP
-        catch (UnknownHostException e1) {
-        	rlog.doLog(Level.SEVERE,"ldap.invalidHost", new Object[] {this.server.toString()});
-			throw new UnknownHostException(rlog.toString());
-		}
-        try { this.login = new LdapName(login); } 
-        catch (InvalidNameException e) {
-        	rlog.doLog(Level.SEVERE,"ldap.invalidName", new Object[] {this.login.toString()});
-        	throw new UnknownHostException(rlog.toString());
-        }
-        this.password = password;
-        this.port = Integer.parseInt(port);  
-        try { this.treeroot = new LdapName(treeroot); } 
-        catch (InvalidNameException e) {
-        	rlog.doLog(Level.SEVERE,"ldap.invalidName", new Object[] {this.treeroot.toString()});
-        	throw new UnknownHostException(rlog.toString());
-        }
-
-        // Bind to Dir.         
-        rlog.doLog(Level.SEVERE,"ldap.connect", new Object[] {this.server.toString().split("/")[0], this.port.toString(), this.treeroot.toString()});
-       
-       JndidapAPI.connect(this.server, this.port, this.login, this.password);
+    	
+       // Bind to Dir.         
+       rlog.doLog(Level.INFO,"ldap.connect", new Object[] {cfg.getHost().getHostName(), cfg.getPort(), cfg.getBindBase(), cfg.getBindDn()});
+       JndidapAPI.connect(cfg.getHost(), cfg.getPort(), cfg.getBindDn(), cfg.getPasswd());
        rlog.doLog(Level.FINE,"ldap.connectOK",new Object[] {}); 
 
        this.spifi = new SpifDir(spifPath); 

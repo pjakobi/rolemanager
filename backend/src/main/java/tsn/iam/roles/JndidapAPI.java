@@ -92,7 +92,7 @@ public class JndidapAPI {
             ctx = new InitialLdapContext(env, null);     
         } catch (NamingException ex) { 
         	rlog.doLog(Level.WARNING, "ldap.incorrectAuthn", new Object[] {ex.getLocalizedMessage(), login.toString()});
-        	throw new NamingException(formatter.format(ex.getLocalizedMessage(),login.toString()));
+        	throw new NamingException(rlog.toString());
         } 
     }
 
